@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Informe Práctica 01 - Computación Paralela</title>
+    <style>
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            line-height: 1.6;
+            color: #222;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .contenedor {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 35px 45px;
+            border-radius: 4px;
+        }
+
+        /* Encabezado con logo */
+        .encabezado {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 3px solid #004b87;
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+        }
+
+        .encabezado img {
+            max-height: 70px;
+            width: auto;
+        }
+
+        .datos-institucion {
+            text-align: right;
+        }
+
+        .datos-institucion h2 {
+            margin: 0;
+            font-size: 1.25rem;
+            color: #004b87;
+        }
+
+        .datos-institucion p {
+            margin: 3px 0 0;
+            font-size: 0.95rem;
+            color: #555;
+        }
+
+        /* Título de la práctica */
+        .titulo-practica {
+            background-color: #eef5fb;
+            border-left: 5px solid #004b87;
+            padding: 12px 18px;
+            margin-bottom: 25px;
+        }
+
+        .titulo-practica h1 {
+            margin: 0;
+            font-size: 1.35rem;
+            color: #003366;
+        }
+
+        .titulo-practica p {
+            margin: 5px 0 0;
+            font-size: 0.95rem;
+            color: #333;
+        }
+
+        /* Secciones */
+        h2.seccion-titulo {
+            color: #004b87;
+            border-bottom: 2px solid #004b87;
+            padding-bottom: 5px;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+        }
+
+        h3 {
+            color: #003366;
+            margin-top: 20px;
+            margin-bottom: 8px;
+            font-size: 1.05rem;
+        }
+
+        p, li {
+            font-size: 0.98rem;
+            color: #333;
+            text-align: justify;
+        }
+
+        ul, ol {
+            padding-left: 22px;
+            margin-top: 6px;
+            margin-bottom: 12px;
+        }
+
+        li {
+            margin-bottom: 6px;
+        }
+
+        /* Tablas */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 18px 0;
+            font-size: 0.95rem;
+        }
+
+        table th, table td {
+            border: 1px solid #c2d4e5;
+            padding: 9px 12px;
+            text-align: center;
+        }
+
+        table th {
+            background-color: #004b87;
+            color: #ffffff;
+            font-weight: bold;
+        }
+
+        table tr:nth-child(even) {
+            background-color: #f4f8fc;
+        }
+
+        table td.texto-izq {
+            text-align: left;
+        }
+
+        /* Cajas de especificaciones y respuestas */
+        .caja-info {
+            background: #ffffff;
+            border: 1px solid #b8d4ed;
+            border-left: 4px solid #004b87;
+            padding: 12px 16px;
+            margin: 14px 0;
+            border-radius: 2px;
+        }
+
+        .caja-info strong {
+            color: #003366;
+        }
+
+        /* Bloques de código */
+        pre {
+            background-color: #2b303c;
+            color: #f1f1f1;
+            padding: 12px 16px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 0.88rem;
+            font-family: "Courier New", Courier, monospace;
+            border-left: 4px solid #004b87;
+        }
+
+        code {
+            font-family: "Courier New", Courier, monospace;
+            background: #e9ecef;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-size: 0.9rem;
+        }
+
+        pre code {
+            background: transparent;
+            padding: 0;
+            color: inherit;
+        }
+
+        .pregunta {
+            font-weight: bold;
+            color: #003366;
+            margin-top: 16px;
+            margin-bottom: 4px;
+        }
+
+        .firma {
+            margin-top: 40px;
+            padding-top: 15px;
+            border-top: 1px solid #ddd;
+            font-size: 0.9rem;
+            color: #666;
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+
+<div class="contenedor">
+
+    <!-- Encabezado institucional -->
+    <div class="encabezado">
+        <img src="logo-ups-home.jpg" alt="Logo Universidad Politécnica Salesiana" onerror="this.style.display='none'">
+        <div class="datos-institucion">
+            <h2>Universidad Politécnica Salesiana</h2>
+            <p><strong>Carrera:</strong> Ingeniería en Ciencias de la Computación</p>
+            <p><strong>Materia:</strong> Computación Paralela</p>
+        </div>
+    </div>
+
+    <!-- Título y datos del estudiante -->
+    <div class="titulo-practica">
+        <h1>Informe de Resultados: Actividad Práctica 01</h1>
+        <p><strong>Tema:</strong> Procesamiento Secuencial y Paralelo de Textos con Java Threads</p>
+        <p><strong>Estudiante:</strong> Paul Sebastian Naspud Vivar</p>
+        <p><strong>Fecha:</strong> Octubre 2026</p>
+    </div>
+
+    <!-- 1. Descripción de la solución -->
+    <h2 class="seccion-titulo">1. Descripción de la Solución Implementada</h2>
+    <p>
+        El objetivo de esta práctica consistió en analizar el contenido completo del libro <strong>Don Quijote de la Mancha</strong> en formato TXT, obtenido desde Project Gutenberg, para extraer tres métricas concretas: el <strong>total de palabras</strong> del texto, la cantidad de apariciones de la palabra específica <strong>"Quijote"</strong> y el número de palabras que contienen la secuencia <strong>"ción"</strong>, realizando todas las búsquedas sin distinguir entre mayúsculas y minúsculas. Para garantizar que las mediciones reflejen únicamente el trabajo de la CPU y no el acceso a disco, el archivo se carga completamente en <strong>memoria RAM</strong> antes de iniciar la toma de tiempos.
+    </p>
+    <p>
+        En la versión secuencial desarrollada en la clase <strong>ProcesadorSecuencial</strong>, el procesamiento se realiza mediante un <strong>único hilo</strong> que recorre el texto de manera continua. La separación de las palabras se efectúa reconociendo caracteres alfanuméricos mediante el método <strong>Character.isLetterOrDigit</strong>, lo cual permite saltar signos de puntuación y espacios en blanco, conservando a la vez las tildes y caracteres propios del español como la eñe. Conforme se identifica cada palabra completa, se incrementa el contador general de palabras y se evalúa si coincide exactamente con el término buscado o si contiene la secuencia requerida.
+    </p>
+    <p>
+        Para la solución concurrente en <strong>ProcesadorParalelo</strong> y <strong>AnalizadorThread</strong>, se aplicó una técnica de <strong>descomposición de datos</strong> dividiendo la longitud del texto entre la cantidad de hilos configurados, probando con <strong>2 y 4 hilos</strong>. Para cumplir con la condición de <strong>evitar separar palabras entre bloques contiguos</strong>, se implementó un algoritmo que ajusta los puntos de corte: si un límite cae en medio de una palabra, el puntero se mueve hacia adelante hasta encontrar el siguiente espacio o delimitador. De esta forma, cada hilo recibe únicamente palabras completas y se evita que una palabra quede dividida o se cuente erróneamente entre dos hilos.
+    </p>
+    <p>
+        Cada partición de texto se entrega a un hilo independiente que extiende de la clase <strong>Thread</strong>, ejecutando el análisis sobre su propio segmento. Los hilos se inician al mismo tiempo con el método <strong>start</strong> y el programa principal espera a que todos terminen utilizando el método <strong>join</strong>. Al finalizar, se realiza una reducción simple sumando los contadores parciales de cada hilo para obtener el resultado definitivo, comprobando que los valores obtenidos coincidan exactamente con los calculados por la versión secuencial.
+    </p>
+
+    <!-- 2. Características del equipo -->
+    <h2 class="seccion-titulo">2. Características del Equipo Utilizado</h2>
+    <p>
+        Las pruebas de rendimiento y mediciones de tiempo se llevaron a cabo en el siguiente entorno de hardware y software:
+    </p>
+
+    <div class="caja-info">
+        <ul>
+            <li><strong>Procesador:</strong> Intel(R) Core(TM) i7-1065G7 @ 1.30 GHz (frecuencia turbo hasta 3.90 GHz)</li>
+            <li><strong>Núcleos e Hilos:</strong> 4 núcleos físicos / 8 hilos lógicos</li>
+            <li><strong>Memoria RAM:</strong> 16 GB DDR4 (15.0 GiB reconocidos por el sistema)</li>
+            <li><strong>Sistema Operativo:</strong> Manjaro Linux x86_64 (Kernel 6.12)</li>
+            <li><strong>Java Development Kit:</strong> OpenJDK 21.0.11 de 64 bits</li>
+        </ul>
+    </div>
+
+    <!-- 3. Tabla comparativa -->
+    <h2 class="seccion-titulo">3. Tabla Comparativa de Rendimiento</h2>
+    <p>
+        Para la medición de tiempos se utilizó <code>System.nanoTime()</code>, calculando el promedio exacto de <strong>5 repeticiones</strong> por cada configuración. Se realizaron pruebas con el texto original (~2.07 MB, 386,919 palabras) y con una versión ampliada generada repitiendo el documento 50 veces en memoria (~103.4 MB, 19,345,950 palabras).
+    </p>
+    <p>
+        Fórmula formal (<em>Speedup</em>) con :
+        <br>
+        <center><strong>S = Ts / Tp</strong> (donde <em>Ts</em> es el tiempo secuencial y <em>Tp</em> el tiempo paralelo).</center>
+    </p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Conjunto de datos</th>
+                <th>Hilos</th>
+                <th>Tiempo promedio (ms)</th>
+                <th>Aceleración (Speedup)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="texto-izq"><strong>Original</strong> (~2.07 MB)</td>
+                <td>1 (secuencial)</td>
+                <td>30.37 ms</td>
+                <td>1.00</td>
+            </tr>
+            <tr>
+                <td class="texto-izq"><strong>Original</strong></td>
+                <td>2</td>
+                <td>12.96 ms</td>
+                <td>2.34</td>
+            </tr>
+            <tr>
+                <td class="texto-izq"><strong>Original</strong></td>
+                <td>4</td>
+                <td>6.37 ms</td>
+                <td>4.76</td>
+            </tr>
+            <tr>
+                <td class="texto-izq"><strong>Ampliado (50x)</strong> (~103.4 MB)</td>
+                <td>1 (secuencial)</td>
+                <td>1026.94 ms</td>
+                <td>1.00</td>
+            </tr>
+            <tr>
+                <td class="texto-izq"><strong>Ampliado (50x)</strong></td>
+                <td>2</td>
+                <td>584.74 ms</td>
+                <td>1.76</td>
+            </tr>
+            <tr>
+                <td class="texto-izq"><strong>Ampliado (50x)</strong></td>
+                <td>4</td>
+                <td>339.96 ms</td>
+                <td>3.02</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- 4. Análisis y Respuestas -->
+    <h2 class="seccion-titulo">4. Análisis de Resultados y Preguntas Planteadas</h2>
+
+    <div class="pregunta">1. ¿Qué diferencias se observan entre los tiempos de ejecución secuencial y paralela?</div>
+    <p>
+        La diferencia fundamental radica en que la versión secuencial ejecuta todo el recorrido del texto sobre un único hilo, dependiendo enteramente de la velocidad de un solo núcleo de procesamiento. Al usar la versión paralela, la carga de trabajo se reparte entre los núcleos de la máquina, lo que reduce sustancialmente el tiempo total de cómputo. En el texto original el tiempo cayó de 30.37 ms a 6.37 ms con 4 hilos, y en el texto ampliado pasó de poco más de 1 segundo (1026.94 ms) a solo 339.96 ms.
+    </p>
+
+    <div class="pregunta">2. ¿Cómo influye el número de hilos en el rendimiento?</div>
+    <p>
+        Al aumentar el número de hilos de 1 a 2 y luego a 4, el tiempo de procesamiento disminuye progresivamente, logrando aceleraciones notorias (llegando a 3.02x en el conjunto ampliado). Sin embargo, la aceleración no es estrictamente lineal perfecta (4 hilos no reducen el tiempo exactamente a una cuarta parte en el texto pesado), debido a la sobrecarga inherente de crear hilos en la JVM (<code>new Thread()</code>), el cambio de contexto del sistema operativo y el tiempo de sincronización en <code>join()</code>.
+    </p>
+
+    <div class="pregunta">3. ¿Qué sucede al incrementar el tamaño del documento?</div>
+    <p>
+        Al multiplicar el documento 50 veces (pasando de 2 MB a más de 103 MB y de 380 mil a más de 19 millones de palabras), el tiempo secuencial se incrementó de manera proporcional a la cantidad de datos procesados. En este escenario con mayor volumen, el paralelismo demuestra su verdadero valor práctico: el costo relativo de iniciar los hilos pasa a ser despreciable frente a los cientos de milisegundos de procesamiento útil, aprovechando de forma óptima los núcleos físicos del procesador.
+    </p>
+
+    <div class="pregunta">4. ¿El procesamiento paralelo siempre es más rápido? Justifique su respuesta.</div>
+    <p>
+        No, el procesamiento paralelo no siempre es más rápido. Crear, asignar memoria, poner en cola y coordinar hilos mediante <code>start()</code> y <code>join()</code> tiene un costo computacional fijo (overhead). Si el archivo o tarea a procesar fuera sumamente pequeño (por ejemplo, un texto de 5 KB o una frase), el tiempo que tarda el sistema operativo y la máquina virtual en instanciar los hilos supera ampliamente el tiempo que tomaría procesarlo de corrido en un bucle secuencial, resultando en un tiempo paralelo más lento. El paralelismo solo conviene cuando el volumen de trabajo compensa con creces la sobrecarga de gestión.
+    </p>
+
+    <!-- 5. Conclusiones -->
+    <h2 class="seccion-titulo">5. Conclusiones sobre el Comportamiento del Procesamiento Paralelo</h2>
+    <ul>
+        <li>
+            <strong>Importancia de la descomposición de datos:</strong> La estrategia de ajustar los índices de división hacia delimitadores de palabras fue fundamental para garantizar la coherencia de los datos, demostrando que en programación paralela no basta con dividir bytes o caracteres a ciegas; se debe respetar la semántica de la información trabajada.
+        </li>
+        <li>
+            <strong>Uso directo de Java Threads:</strong> Gestionar los hilos a bajo nivel con <code>start()</code> y <code>join()</code> permite entender claramente el ciclo de vida del hilo y la sincronización tipo <em>Fork-Join</em> manual, acumulando variables locales de cada hilo sin necesidad de mecanismos complejos de bloqueo o exclusión mutua durante la fase de cálculo.
+        </li>
+        <li>
+            <strong>Rendimiento según carga de trabajo:</strong> Se comprobó empíricamente que a mayor tamaño de datos, mayor es el aprovechamiento del hardware multinúcleo, logrando una aceleración superior a 3x en la versión ampliada sobre un procesador de 4 núcleos físicos.
+        </li>
+    </ul>
+
+</div>
+
+</body>
+</html>
