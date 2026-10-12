@@ -1,8 +1,9 @@
 # Actividad Práctica 01: Procesamiento Secuencial y Paralelo de Textos con Java Threads
 
-**Materia:** Computación Paralela 
+**Materia:** Computación Paralela  
 **Institución:** Universidad Politécnica Salesiana  
 **Estudiante:** Paul Sebastian Naspud Vivar  
+**Repositorio:** [GitHub - Tarea_0_CP_Comparacion](https://github.com/PaulSebastian9720/Portfolio_Parallel_Computing/tree/main/Tarea_0_CP_Comparacion)  
 
 ---
 
