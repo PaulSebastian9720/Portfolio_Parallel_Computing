@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Informe Práctica 02 - Computación Paralela</title>
+    <style>
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            line-height: 1.6;
+            color: #222;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .contenedor {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 35px 45px;
+            border-radius: 4px;
+        }
+
+        /* Encabezado con logo */
+        .encabezado {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 3px solid #004b87;
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+        }
+
+        .encabezado img {
+            max-height: 70px;
+            width: auto;
+        }
+
+        .datos-institucion {
+            text-align: right;
+        }
+
+        .datos-institucion h2 {
+            margin: 0;
+            font-size: 1.25rem;
+            color: #004b87;
+        }
+
+        .datos-institucion p {
+            margin: 3px 0 0;
+            font-size: 0.95rem;
+            color: #555;
+        }
+
+        /* Título de la práctica */
+        .titulo-practica {
+            background-color: #eef5fb;
+            border-left: 5px solid #004b87;
+            padding: 12px 18px;
+            margin-bottom: 25px;
+        }
+
+        .titulo-practica h1 {
+            margin: 0;
+            font-size: 1.35rem;
+            color: #003366;
+        }
+
+        .titulo-practica p {
+            margin: 5px 0 0;
+            font-size: 0.95rem;
+            color: #333;
+        }
+
+        /* Secciones */
+        h2.seccion-titulo {
+            color: #004b87;
+            border-bottom: 2px solid #004b87;
+            padding-bottom: 5px;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+        }
+
+        h3 {
+            color: #003366;
+            margin-top: 20px;
+            margin-bottom: 8px;
+            font-size: 1.05rem;
+        }
+
+        p, li {
+            font-size: 0.98rem;
+            color: #333;
+            text-align: justify;
+        }
+
+        ul, ol {
+            padding-left: 22px;
+            margin-top: 6px;
+            margin-bottom: 12px;
+        }
+
+        li {
+            margin-bottom: 6px;
+        }
+
+        /* Tablas */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 18px 0;
+            font-size: 0.95rem;
+        }
+
+        table th, table td {
+            border: 1px solid #c2d4e5;
+            padding: 9px 12px;
+            text-align: center;
+        }
+
+        table th {
+            background-color: #004b87;
+            color: #ffffff;
+            font-weight: bold;
+        }
+
+        table tr:nth-child(even) {
+            background-color: #f4f8fc;
+        }
+
+        table td.texto-izq {
+            text-align: left;
+        }
+
+        /* Cajas de especificaciones y respuestas */
+        .caja-info {
+            background: #ffffff;
+            border: 1px solid #b8d4ed;
+            border-left: 4px solid #004b87;
+            padding: 12px 16px;
+            margin: 14px 0;
+            border-radius: 2px;
+        }
+
+        .caja-info strong {
+            color: #003366;
+        }
+
+        /* Bloques de código */
+        pre {
+            background-color: #2b303c;
+            color: #f1f1f1;
+            padding: 12px 16px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 0.88rem;
+            font-family: "Courier New", Courier, monospace;
+            border-left: 4px solid #004b87;
+        }
+
+        code {
+            font-family: "Courier New", Courier, monospace;
+            background: #e9ecef;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-size: 0.9rem;
+        }
+
+        pre code {
+            background: transparent;
+            padding: 0;
+            color: inherit;
+        }
+
+        .pregunta {
+            font-weight: bold;
+            color: #003366;
+            margin-top: 16px;
+            margin-bottom: 4px;
+        }
+
+        /* Imágenes de entrada y salida */
+        .imagenes {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin: 18px 0;
+        }
+
+        .imagenes figure {
+            flex: 1 1 300px;
+            margin: 0;
+            text-align: center;
+        }
+
+        .imagenes img {
+            width: 100%;
+            border: 1px solid #c2d4e5;
+            border-radius: 2px;
+        }
+
+        .imagenes figcaption {
+            font-size: 0.9rem;
+            color: #555;
+            margin-top: 6px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="contenedor">
+
+    <!-- Encabezado institucional -->
+    <div class="encabezado">
+        <img src="logo-ups-home.jpg" alt="Logo Universidad Politécnica Salesiana" onerror="this.style.display='none'">
+        <div class="datos-institucion">
+            <h2>Universidad Politécnica Salesiana</h2>
+            <p><strong>Carrera:</strong> Ingeniería en Ciencias de la Computación</p>
+            <p><strong>Materia:</strong> Computación Paralela</p>
+        </div>
+    </div>
+
+    <!-- Título y datos del estudiante -->
+    <div class="titulo-practica">
+        <h1>Informe de Resultados: Actividad Práctica 02</h1>
+        <p><strong>Tema:</strong> Detección de Bordes (Sobel) por Bloques: Procesamiento Secuencial y Paralelo con Java Threads y JavaCV</p>
+        <p><strong>Estudiante:</strong> Paul Sebastian Naspud Vivar</p>
+        <p><strong>Fecha:</strong> Octubre 2026</p>
+        <p><strong>Repositorio GitHub:</strong> <a href="https://github.com/PaulSebastian9720/Portfolio_Parallel_Computing/tree/main/02-Foto-Paralelo" target="_blank" style="color: #004b87; word-break: break-all;">https://github.com/PaulSebastian9720/Portfolio_Parallel_Computing/tree/main/02-Foto-Paralelo</a></p>
+    </div>
+
+    <!-- 1. Descripción de la solución -->
+    <h2 class="seccion-titulo">1. Descripción de la Solución Implementada</h2>
+    <p>
+        El objetivo de esta práctica fue aplicar <strong>detección de bordes con el filtro Sobel</strong> sobre una imagen de alta resolución, comparando el tiempo de un procesamiento <strong>secuencial</strong> (1 hilo) contra uno <strong>paralelo</strong> con 2, 4 y 6 hilos. Se utilizó una imagen cuadrada de <strong>6000 x 6000 píxeles</strong> descargada desde <strong>Unsplash</strong>
+        (<a href="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=6000&amp;h=6000&amp;fit=crop&amp;fm=jpg&amp;q=90" target="_blank" style="color: #004b87; word-break: break-all;">enlace de descarga</a>).
+        Todo el procesamiento de imagen se realizó con la biblioteca <strong>JavaCV</strong> (versión 1.5.10), que es el <em>wrapper</em> de <strong>OpenCV 4.9.0</strong> para Java.
+    </p>
+    <p>
+        La solución se organizó en tres clases. La clase <strong>ImageProcessor</strong> carga la imagen con <code>imread</code> y la divide en una cuadrícula fija de <strong>8 x 8 = 64 bloques</strong> de 750 x 750 píxeles (<code>ladoBloque = 6000 / 8</code>). Cada bloque se lee con un <strong>halo de 3 píxeles</strong> de sus vecinos (2 px que necesita el suavizado Gaussiano 5x5 y 1 px del Sobel 3x3), para que no aparezcan líneas falsas en las uniones entre bloques. Sobre cada bloque se aplica el pipeline completo de OpenCV:
+    </p>
+    <pre><code>cvtColor(region, gris, COLOR_BGR2GRAY);          // escala de grises
+GaussianBlur(gris, gris, new Size(5, 5), 0);     // suavizado
+Sobel(gris, gx, CV_16S, 1, 0);                   // cambio de intensidad horizontal
+Sobel(gris, gy, CV_16S, 0, 1);                   // cambio de intensidad vertical
+addWeighted(absX, 0.5, absY, 0.5, 0, magnitud);  // combinación de Gx y Gy
+threshold(magnitud, bordes, 50, 255, THRESH_BINARY);  // máscara binaria de bordes</code></pre>
+    <p>
+        Al terminar, cada bloque descarta su halo y copia solo su núcleo a su posición dentro de la máscara final, de modo que la imagen se <strong>reconstruye</strong> directamente sin necesidad de guardar fragmentos sueltos. La imagen ensamblada se guarda con <code>imwrite</code> fuera de la medición de tiempo.
+    </p>
+    <p>
+        La clase <strong>TaskWorker</strong> extiende de <strong>Thread</strong>. Las tareas se reparten de forma <strong>cíclica (round-robin)</strong>: el hilo <em>k</em> procesa las tareas <em>k, k+N, k+2N, ...</em> (N = número de hilos). En el modo secuencial se llama a <code>run()</code> directamente en el hilo principal; en el modo paralelo se lanzan los N hilos con <code>start()</code> y el programa principal los espera con <code>join()</code>. Como cada bloque escribe en una zona distinta de la máscara, no se necesita sincronización. Finalmente, la clase <strong>Main</strong> ejecuta las corridas, mide los tiempos y muestra la tabla comparativa.
+    </p>
+    <p>
+        Un detalle importante: OpenCV paraleliza internamente sus funciones. Por eso se llamó a <code>setNumThreads(0)</code>, de forma que cada función de OpenCV se ejecute en un solo hilo y el único paralelismo medido sea el de los hilos de Java.
+    </p>
+
+    <!-- 2. Características del equipo -->
+    <h2 class="seccion-titulo">2. Características del Equipo Utilizado</h2>
+    <p>
+        Las pruebas de rendimiento y mediciones de tiempo se llevaron a cabo en el siguiente entorno de hardware y software:
+    </p>
+
+    <div class="caja-info">
+        <ul>
+            <li><strong>Procesador:</strong> Intel(R) Core(TM) i7-1065G7 @ 1,30 GHz (frecuencia turbo hasta 3,90 GHz)</li>
+            <li><strong>Núcleos e Hilos:</strong> 4 núcleos físicos / 8 hilos lógicos</li>
+            <li><strong>Memoria RAM:</strong> 16 GB DDR4 (15,0 GiB reconocidos por el sistema)</li>
+            <li><strong>Sistema Operativo:</strong> Manjaro Linux x86_64 (Kernel 6.12)</li>
+            <li><strong>Java Development Kit:</strong> OpenJDK 21.0.11 de 64 bits</li>
+            <li><strong>Biblioteca de visión:</strong> JavaCV 1.5.10 (OpenCV 4.9.0)</li>
+        </ul>
+    </div>
+
+    <!-- 3. Tabla comparativa -->
+    <h2 class="seccion-titulo">3. Tabla Comparativa de Rendimiento</h2>
+    <p>
+        Para la medición se utilizó <code>System.nanoTime()</code>, calculando el promedio de <strong>3 repeticiones</strong> por configuración, después de 3 corridas de calentamiento no medidas para que el compilador JIT de la JVM no afecte los resultados. Se probó con la imagen <strong>original</strong> (1 imagen de 6000 x 6000 = 64 bloques) y con un <strong>lote ampliado</strong> de 100 imágenes (100 x 64 = <strong>6400 bloques</strong>, unos 3600 millones de píxeles en total).
+    </p>
+    <p>
+        Fórmula de la aceleración (<em>Speedup</em>):
+        <br>
+        <center><strong>S = Ts / Tp</strong> (donde <em>Ts</em> es el tiempo secuencial y <em>Tp</em> el tiempo paralelo).</center>
+    </p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Conjunto de datos / Resolución</th>
+                <th>Hilos</th>
+                <th>Tiempo promedio</th>
+                <th>Aceleración (Speedup)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="texto-izq"><strong>Original</strong> (6000 x 6000, 64 bloques)</td>
+                <td>1 (secuencial)</td>
+                <td>102,27 ms</td>
+                <td>1,00</td>
+            </tr>
+            <tr>
+                <td class="texto-izq"><strong>Original</strong></td>
+                <td>2</td>
+                <td>70,30 ms</td>
+                <td>1,45</td>
+            </tr>
+            <tr>
+                <td class="texto-izq"><strong>Original</strong></td>
+                <td>4</td>
+                <td>59,29 ms</td>
+                <td>1,72</td>
+            </tr>
+            <tr>
+                <td class="texto-izq"><strong>Original</strong></td>
+                <td>6</td>
+                <td>52,06 ms</td>
+                <td>1,96</td>
+            </tr>
+            <tr>
+                <td class="texto-izq"><strong>Ampliado (Lote 100x)</strong> (6400 bloques)</td>
+                <td>1 (secuencial)</td>
+                <td>11,48 s</td>
+                <td>1,00</td>
+            </tr>
+            <tr>
+                <td class="texto-izq"><strong>Ampliado (Lote 100x)</strong></td>
+                <td>2</td>
+                <td>6,84 s</td>
+                <td>1,68</td>
+            </tr>
+            <tr>
+                <td class="texto-izq"><strong>Ampliado (Lote 100x)</strong></td>
+                <td>4</td>
+                <td>6,02 s</td>
+                <td>1,91</td>
+            </tr>
+            <tr>
+                <td class="texto-izq"><strong>Ampliado (Lote 100x)</strong></td>
+                <td>6</td>
+                <td>5,41 s</td>
+                <td>2,12</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3>Ejemplo de reparto de bloques por hilo (Ampliado 100x con 6 hilos)</h3>
+    <p>
+        En el lote ampliado hay 100 imágenes de 64 bloques, es decir, <strong>6400 tareas</strong>. Cada tarea se identifica por un número, del que se obtiene la imagen y el bloque: <code>imagen = tarea / 64</code> y <code>bloque = tarea % 64</code>. Con 6 hilos, 6400 / 6 = 1066 con residuo 4, por lo que los 4 primeros hilos procesan un bloque más. Cada hilo trabaja el equivalente a unas <strong>16,7 imágenes completas</strong>:
+    </p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Hilo</th>
+                <th>Tareas asignadas</th>
+                <th>Bloques procesados</th>
+                <th>Equivale a (imágenes)</th>
+                <th>Tiempo del hilo</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td>Hilo-1</td><td>0, 6, 12, 18, ...</td><td>1067</td><td>16,67</td><td>5,11 s</td></tr>
+            <tr><td>Hilo-2</td><td>1, 7, 13, 19, ...</td><td>1067</td><td>16,67</td><td>5,41 s</td></tr>
+            <tr><td>Hilo-3</td><td>2, 8, 14, 20, ...</td><td>1067</td><td>16,67</td><td>5,29 s</td></tr>
+            <tr><td>Hilo-4</td><td>3, 9, 15, 21, ...</td><td>1067</td><td>16,67</td><td>5,24 s</td></tr>
+            <tr><td>Hilo-5</td><td>4, 10, 16, 22, ...</td><td>1066</td><td>16,66</td><td>5,16 s</td></tr>
+            <tr><td>Hilo-6</td><td>5, 11, 17, 23, ...</td><td>1066</td><td>16,66</td><td>5,30 s</td></tr>
+        </tbody>
+    </table>
+    <p>
+        Por ejemplo, la tarea 70 la procesa el Hilo-5 (70 % 6 = 4) y corresponde a la <strong>imagen 2, bloque 6</strong> (70 / 64 = 1, 70 % 64 = 6). Los tiempos de los 6 hilos son muy parecidos (entre 5,1 y 5,4 segundos), lo que muestra que el reparto cíclico equilibra bien la carga. Así se muestra en la consola:
+    </p>
+    <pre><code>  ▶ PARALELO (6 hilos)
+    ------------------------------------------------
+    Hilo         | Bloques    | Tiempo (ms)
+    ------------------------------------------------
+    Hilo-1       | 1067       |            5105,00
+    Hilo-2       | 1067       |            5411,63
+    Hilo-3       | 1067       |            5294,63
+    Hilo-4       | 1067       |            5242,36
+    Hilo-5       | 1066       |            5155,02
+    Hilo-6       | 1066       |            5301,58
+    ------------------------------------------------
+    Bloques: 6400 | min 1,76 ms | prom 4,92 ms | max 21,51 ms
+    Promedio: 5409,18 ms</code></pre>
+
+    <h3>Imagen de entrada y salida</h3>
+    <div class="imagenes">
+        <figure>
+            <img src="entrada.jpg" alt="Imagen de entrada">
+            <figcaption>Entrada: fotografía de Unsplash (6000 x 6000 px)</figcaption>
+        </figure>
+        <figure>
+            <img src="salida.png" alt="Máscara de bordes reconstruida">
+            <figcaption>Salida: máscara de bordes Sobel reconstruida (64 bloques, 6 hilos)</figcaption>
+        </figure>
+    </div>
+    <p>
+        La salida no presenta cortes ni líneas en las uniones de los bloques gracias al uso del halo, y es idéntica sin importar el número de hilos utilizado.
+    </p>
+
+    <!-- 4. Análisis y Respuestas -->
+    <h2 class="seccion-titulo">4. Análisis de Resultados y Preguntas Planteadas</h2>
+
+    <div class="pregunta">1. ¿Qué diferencias se observan entre los tiempos de ejecución secuencial y paralela?</div>
+    <p>
+        La versión paralela siempre fue más rápida. En la imagen original el tiempo bajó de 102,27 ms a 52,06 ms con 6 hilos, y en el lote ampliado pasó de 11,48 s a 5,41 s, reduciendo el tiempo a menos de la mitad.
+    </p>
+
+    <div class="pregunta">2. ¿Cómo influye el número de hilos en el rendimiento?</div>
+    <p>
+        Al pasar de 1 a 2 hilos se obtiene la mayor mejora (1,68x en el ampliado), pero de 2 a 4 y de 4 a 6 la ganancia es cada vez menor. La causa es que OpenCV procesa cada bloque muy rápido (alrededor de 2 ms), por lo que el límite deja de ser la CPU y pasa a ser el <strong>ancho de banda de la memoria RAM</strong>: todos los hilos compiten por leer la imagen y escribir la máscara. Esto se ve en que el tiempo promedio por bloque sube de 2,00 ms con 1 hilo a 4,92 ms con 6 hilos. Además, el procesador tiene solo 4 núcleos físicos, así que con 6 hilos dos de ellos comparten núcleo mediante <em>Hyper-Threading</em>.
+    </p>
+
+    <div class="pregunta">3. ¿Qué sucede al incrementar el tamaño de los datos?</div>
+    <p>
+        Con el lote de 100 imágenes el tiempo secuencial crece de forma proporcional (unas 112 veces el de una sola imagen) y el <em>speedup</em> mejora en todas las configuraciones (por ejemplo, de 1,72 a 1,91 con 4 hilos). Con más trabajo, el costo fijo de crear y sincronizar los hilos se vuelve despreciable frente al tiempo de procesamiento útil.
+    </p>
+
+    <div class="pregunta">4. ¿El procesamiento paralelo siempre es más rápido? Justifique su respuesta.</div>
+    <p>
+        No. Crear los hilos con <code>start()</code> y esperarlos con <code>join()</code> tiene un costo fijo; si la imagen fuera pequeña, ese costo podría superar el tiempo de procesarla de forma secuencial. Además, como se observó, cuando la tarea está limitada por la memoria, agregar más hilos deja de aportar porque todos compiten por el mismo recurso.
+    </p>
+
+    <!-- 5. Conclusiones -->
+    <h2 class="seccion-titulo">5. Conclusiones sobre el Comportamiento del Procesamiento Paralelo</h2>
+    <ul>
+        <li>
+            <strong>Descomposición con halo:</strong> Dividir la imagen en bloques permite procesarlos de forma independiente, pero los filtros necesitan los píxeles vecinos. El halo de 3 píxeles resolvió este problema y la imagen reconstruida no presenta cortes en las uniones.
+        </li>
+        <li>
+            <strong>Uso de JavaCV y Java Threads:</strong> JavaCV permitió aplicar todo el pipeline (grises, Gauss, Sobel y umbral) con funciones optimizadas de OpenCV, mientras que <code>extends Thread</code> con <code>start()</code> y <code>join()</code> controló el paralelismo de forma simple y sin bloqueos, ya que cada bloque escribe en una zona distinta de la imagen.
+        </li>
+        <li>
+            <strong>Límite del hardware:</strong> La aceleración máxima fue de 2,12x con 6 hilos en el lote ampliado. Al ser OpenCV tan eficiente, el cuello de botella fue el acceso a memoria y no el cálculo, lo que demuestra que el paralelismo rinde más cuando cada tarea tiene una carga de cómputo alta en relación con los datos que mueve.
+        </li>
+    </ul>
+
+</div>
+
+</body>
+</html>
