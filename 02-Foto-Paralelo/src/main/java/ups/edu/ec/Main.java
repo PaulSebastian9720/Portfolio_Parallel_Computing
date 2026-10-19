@@ -1,12 +1,8 @@
 package ups.edu.ec;
 
-import org.bytedeco.opencv.opencv_core.Mat;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-
-import static org.bytedeco.opencv.global.opencv_core.*;
 
 /**
  * Detección de bordes (Sobel) por bloques: comparativa secuencial vs paralelo con hilos de Java.
@@ -28,22 +24,19 @@ public class Main {
     private static final int[] HILOS = {1, 2, 4, 6};
     private static final int REPETICIONES = 3;
     private static final int CALENTAMIENTO = 3;
-    private static final int COPIAS_LOTE = 100;
+    private static final int COPIAS_LOTE = 25;
 
-    record Corrida(double totalMs, TaskWorker[] hilos, Mat[] mascaras) {}
+    record Corrida(double totalMs, TaskWorker[] hilos, byte[][] mascaras) {}
     record Fila(String conjunto, int hilos, double promedioMs) {}
 
     public static void main(String[] args) throws Exception {
         Locale.setDefault(Locale.of("es", "EC"));   // decimales con coma
-        // OpenCV paraleliza internamente sus funciones; se desactiva para que
-        // el único paralelismo medido sea el de nuestros hilos de Java.
-        setNumThreads(0);
 
-        ImageProcessor procesador = new ImageProcessor(RUTA_IMAGEN);
+        ImageProcessorJava procesador = new ImageProcessorJava(RUTA_IMAGEN);
 
         // Calentamiento de la JVM (corridas no medidas)
         for (int i = 0; i < CALENTAMIENTO; i++) {
-            liberar(ejecutar(procesador, 1, 1));
+            ejecutar(procesador, crearMascaras(procesador, 1), 1);
         }
 
         String res = procesador.getLado() + "x" + procesador.getLado();
@@ -57,12 +50,9 @@ public class Main {
      * Ejecuta todas las tareas (copias x bloques):
      *   - Secuencial (1 hilo): run() se llama directamente en el hilo principal.
      *   - Paralelo  (N hilos): se lanzan N TaskWorker con start() y se esperan con join().
+     * Las máscaras se reutilizan entre corridas: cada corrida sobrescribe todos sus píxeles.
      */
-    private static Corrida ejecutar(ImageProcessor procesador, int copias, int numHilos) throws Exception {
-        Mat[] mascaras = new Mat[copias];
-        for (int c = 0; c < copias; c++) {
-            mascaras[c] = procesador.crearMascara();
-        }
+    private static Corrida ejecutar(ImageProcessorJava procesador, byte[][] mascaras, int numHilos) throws Exception {
         TaskWorker[] hilos = new TaskWorker[numHilos];
         for (int i = 0; i < numHilos; i++) {
             hilos[i] = new TaskWorker(i, numHilos, procesador, mascaras);
@@ -81,17 +71,18 @@ public class Main {
         return new Corrida(aMs(fin - inicio), hilos, mascaras);
     }
 
-    private static List<Fila> medir(ImageProcessor procesador, String conjunto, String prefijo, int copias)
+    private static List<Fila> medir(ImageProcessorJava procesador, String conjunto, String prefijo, int copias)
             throws Exception {
         titulo("CONJUNTO: " + conjunto + " — " + copias * procesador.getBloques().size() + " bloques");
         List<Fila> filas = new ArrayList<>();
+        byte[][] mascaras = crearMascaras(procesador, copias);
 
         for (int hilos : HILOS) {
             System.out.println("\n  ▶ " + (hilos == 1 ? "SECUENCIAL (1 hilo)" : "PARALELO (" + hilos + " hilos)"));
             double suma = 0;
 
             for (int rep = 1; rep <= REPETICIONES; rep++) {
-                Corrida corrida = ejecutar(procesador, copias, hilos);
+                Corrida corrida = ejecutar(procesador, mascaras, hilos);
                 suma += corrida.totalMs();
 
                 if (rep == 1) {
@@ -99,7 +90,6 @@ public class Main {
                     procesador.guardar(corrida.mascaras()[0],
                             CARPETA_SALIDA + "/bordes_" + prefijo + "_" + hilos + "h.png");
                 }
-                liberar(corrida);
             }
             double promedio = suma / REPETICIONES;
             System.out.printf("    Promedio: %.2f ms%n", promedio);
@@ -153,9 +143,13 @@ public class Main {
         System.out.println();
     }
 
-    /** Libera la memoria nativa de las máscaras de una corrida. */
-    private static void liberar(Corrida corrida) {
-        for (Mat m : corrida.mascaras()) m.close();
+    /** Una máscara vacía por cada imagen del lote. */
+    private static byte[][] crearMascaras(ImageProcessorJava procesador, int copias) {
+        byte[][] mascaras = new byte[copias][];
+        for (int c = 0; c < copias; c++) {
+            mascaras[c] = procesador.crearMascara();
+        }
+        return mascaras;
     }
 
     private static double aMs(long nanos) {

@@ -223,8 +223,8 @@
     <!-- Título y datos del estudiante -->
     <div class="titulo-practica">
         <h1>Informe de Resultados: Actividad Práctica 02</h1>
-        <p><strong>Tema:</strong> Detección de Bordes (Sobel) por Bloques: Procesamiento Secuencial y Paralelo con Java Threads y JavaCV</p>
-        <p><strong>Estudiante:</strong> Paul Sebastian Naspud Vivar</p>
+        <p><strong>Tema:</strong> Detección de Bordes Sobel por Bloques: Procesamiento Secuencial y Paralelo con Java Threads</p>
+        <p><strong>Estudiantes:</strong> Paul Naspud, Camila Ramirez</p>
         <p><strong>Fecha:</strong> Octubre 2026</p>
         <p><strong>Repositorio GitHub:</strong> <a href="https://github.com/PaulSebastian9720/Portfolio_Parallel_Computing/tree/main/02-Foto-Paralelo" target="_blank" style="color: #004b87; word-break: break-all;">https://github.com/PaulSebastian9720/Portfolio_Parallel_Computing/tree/main/02-Foto-Paralelo</a></p>
     </div>
@@ -234,25 +234,26 @@
     <p>
         El objetivo de esta práctica fue aplicar <strong>detección de bordes con el filtro Sobel</strong> sobre una imagen de alta resolución, comparando el tiempo de un procesamiento <strong>secuencial</strong> (1 hilo) contra uno <strong>paralelo</strong> con 2, 4 y 6 hilos. Se utilizó una imagen cuadrada de <strong>6000 x 6000 píxeles</strong> descargada desde <strong>Unsplash</strong>
         (<a href="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=6000&amp;h=6000&amp;fit=crop&amp;fm=jpg&amp;q=90" target="_blank" style="color: #004b87; word-break: break-all;">enlace de descarga</a>).
-        Todo el procesamiento de imagen se realizó con la biblioteca <strong>JavaCV</strong> (versión 1.5.10), que es el <em>wrapper</em> de <strong>OpenCV 4.9.0</strong> para Java.
     </p>
     <p>
-        La solución se organizó en tres clases. La clase <strong>ImageProcessor</strong> carga la imagen con <code>imread</code> y la divide en una cuadrícula fija de <strong>8 x 8 = 64 bloques</strong> de 750 x 750 píxeles (<code>ladoBloque = 6000 / 8</code>). Cada bloque se lee con un <strong>halo de 3 píxeles</strong> de sus vecinos (2 px que necesita el suavizado Gaussiano 5x5 y 1 px del Sobel 3x3), para que no aparezcan líneas falsas en las uniones entre bloques. Sobre cada bloque se aplica el pipeline completo de OpenCV:
+        La imagen se divide en una cuadrícula fija de <strong>8 x 8 = 64 bloques</strong> de 750 x 750 píxeles (<code>ladoBloque = 6000 / 8</code>). Cada bloque se lee con un <strong>halo de 3 píxeles</strong> de sus vecinos (2 px que necesita el suavizado Gaussiano 5x5 y 1 px del Sobel 3x3), para que no aparezcan líneas falsas en las uniones entre bloques. Sobre cada bloque se aplica el pipeline completo:
     </p>
-    <pre><code>cvtColor(region, gris, COLOR_BGR2GRAY);          // escala de grises
-GaussianBlur(gris, gris, new Size(5, 5), 0);     // suavizado
-Sobel(gris, gx, CV_16S, 1, 0);                   // cambio de intensidad horizontal
-Sobel(gris, gy, CV_16S, 0, 1);                   // cambio de intensidad vertical
-addWeighted(absX, 0.5, absY, 0.5, 0, magnitud);  // combinación de Gx y Gy
-threshold(magnitud, bordes, 50, 255, THRESH_BINARY);  // máscara binaria de bordes</code></pre>
+    <ol>
+        <li><strong>Escala de grises:</strong> luminancia <code>0,299 R + 0,587 G + 0,114 B</code>.</li>
+        <li><strong>Suavizado Gaussiano 5x5:</strong> reduce el ruido antes de buscar bordes.</li>
+        <li><strong>Filtro Sobel:</strong> calcula el cambio de intensidad horizontal (<em>Gx</em>) y vertical (<em>Gy</em>).</li>
+        <li><strong>Umbral:</strong> los píxeles con magnitud mayor a 50 se marcan como borde (blanco) y el resto como fondo (negro).</li>
+    </ol>
+    <pre><code>Gx = | -1  0  1 |      Gy = | -1 -2 -1 |
+     | -2  0  2 |           |  0  0  0 |
+     | -1  0  1 |           |  1  2  1 |
+
+magnitud = 0,5 |Gx| + 0,5 |Gy|      borde si magnitud &gt; 50</code></pre>
     <p>
-        Al terminar, cada bloque descarta su halo y copia solo su núcleo a su posición dentro de la máscara final, de modo que la imagen se <strong>reconstruye</strong> directamente sin necesidad de guardar fragmentos sueltos. La imagen ensamblada se guarda con <code>imwrite</code> fuera de la medición de tiempo.
+        Al terminar, cada bloque descarta su halo y copia solo su núcleo a su posición dentro de la máscara final, de modo que la imagen se <strong>reconstruye</strong> directamente sin necesidad de guardar fragmentos sueltos. La imagen ensamblada se guarda en disco fuera de la medición de tiempo.
     </p>
     <p>
-        La clase <strong>TaskWorker</strong> extiende de <strong>Thread</strong>. Las tareas se reparten de forma <strong>cíclica (round-robin)</strong>: el hilo <em>k</em> procesa las tareas <em>k, k+N, k+2N, ...</em> (N = número de hilos). En el modo secuencial se llama a <code>run()</code> directamente en el hilo principal; en el modo paralelo se lanzan los N hilos con <code>start()</code> y el programa principal los espera con <code>join()</code>. Como cada bloque escribe en una zona distinta de la máscara, no se necesita sincronización. Finalmente, la clase <strong>Main</strong> ejecuta las corridas, mide los tiempos y muestra la tabla comparativa.
-    </p>
-    <p>
-        Un detalle importante: OpenCV paraleliza internamente sus funciones. Por eso se llamó a <code>setNumThreads(0)</code>, de forma que cada función de OpenCV se ejecute en un solo hilo y el único paralelismo medido sea el de los hilos de Java.
+        Para la concurrencia, la clase <strong>TaskWorker</strong> extiende de <strong>Thread</strong>. Las tareas se reparten de forma <strong>cíclica (round-robin)</strong>: el hilo <em>k</em> procesa las tareas <em>k, k+N, k+2N, ...</em> (N = número de hilos). En el modo secuencial se llama a <code>run()</code> directamente en el hilo principal; en el modo paralelo se lanzan los N hilos con <code>start()</code> y el programa principal los espera con <code>join()</code>. Como cada bloque escribe en una zona distinta de la máscara, no se necesita sincronización.
     </p>
 
     <!-- 2. Características del equipo -->
@@ -268,14 +269,13 @@ threshold(magnitud, bordes, 50, 255, THRESH_BINARY);  // máscara binaria de bor
             <li><strong>Memoria RAM:</strong> 16 GB DDR4 (15,0 GiB reconocidos por el sistema)</li>
             <li><strong>Sistema Operativo:</strong> Manjaro Linux x86_64 (Kernel 6.12)</li>
             <li><strong>Java Development Kit:</strong> OpenJDK 21.0.11 de 64 bits</li>
-            <li><strong>Biblioteca de visión:</strong> JavaCV 1.5.10 (OpenCV 4.9.0)</li>
         </ul>
     </div>
 
     <!-- 3. Tabla comparativa -->
     <h2 class="seccion-titulo">3. Tabla Comparativa de Rendimiento</h2>
     <p>
-        Para la medición se utilizó <code>System.nanoTime()</code>, calculando el promedio de <strong>3 repeticiones</strong> por configuración, después de 3 corridas de calentamiento no medidas para que el compilador JIT de la JVM no afecte los resultados. Se probó con la imagen <strong>original</strong> (1 imagen de 6000 x 6000 = 64 bloques) y con un <strong>lote ampliado</strong> de 100 imágenes (100 x 64 = <strong>6400 bloques</strong>, unos 3600 millones de píxeles en total).
+        Para la medición se utilizó <code>System.nanoTime()</code>, calculando el promedio de <strong>3 repeticiones</strong> por configuración, después de 3 corridas de calentamiento no medidas para que el compilador JIT de la JVM no afecte los resultados. Se probó con la imagen <strong>original</strong> (1 imagen de 6000 x 6000 = 64 bloques) y con un <strong>lote ampliado</strong> de 25 imágenes (25 x 64 = <strong>1600 bloques</strong>, unos 900 millones de píxeles en total).
     </p>
     <p>
         Fórmula de la aceleración (<em>Speedup</em>):
@@ -296,57 +296,57 @@ threshold(magnitud, bordes, 50, 255, THRESH_BINARY);  // máscara binaria de bor
             <tr>
                 <td class="texto-izq"><strong>Original</strong> (6000 x 6000, 64 bloques)</td>
                 <td>1 (secuencial)</td>
-                <td>102,27 ms</td>
+                <td>758,16 ms</td>
                 <td>1,00</td>
             </tr>
             <tr>
                 <td class="texto-izq"><strong>Original</strong></td>
                 <td>2</td>
-                <td>70,30 ms</td>
-                <td>1,45</td>
+                <td>404,96 ms</td>
+                <td>1,87</td>
             </tr>
             <tr>
                 <td class="texto-izq"><strong>Original</strong></td>
                 <td>4</td>
-                <td>59,29 ms</td>
-                <td>1,72</td>
+                <td>237,22 ms</td>
+                <td>3,20</td>
             </tr>
             <tr>
                 <td class="texto-izq"><strong>Original</strong></td>
                 <td>6</td>
-                <td>52,06 ms</td>
-                <td>1,96</td>
+                <td>219,26 ms</td>
+                <td>3,46</td>
             </tr>
             <tr>
-                <td class="texto-izq"><strong>Ampliado (Lote 100x)</strong> (6400 bloques)</td>
+                <td class="texto-izq"><strong>Ampliado (Lote 25x)</strong> (1600 bloques)</td>
                 <td>1 (secuencial)</td>
-                <td>11,48 s</td>
+                <td>18,02 s</td>
                 <td>1,00</td>
             </tr>
             <tr>
-                <td class="texto-izq"><strong>Ampliado (Lote 100x)</strong></td>
+                <td class="texto-izq"><strong>Ampliado (Lote 25x)</strong></td>
                 <td>2</td>
-                <td>6,84 s</td>
-                <td>1,68</td>
+                <td>9,39 s</td>
+                <td>1,92</td>
             </tr>
             <tr>
-                <td class="texto-izq"><strong>Ampliado (Lote 100x)</strong></td>
+                <td class="texto-izq"><strong>Ampliado (Lote 25x)</strong></td>
                 <td>4</td>
-                <td>6,02 s</td>
-                <td>1,91</td>
+                <td>6,39 s</td>
+                <td>2,82</td>
             </tr>
             <tr>
-                <td class="texto-izq"><strong>Ampliado (Lote 100x)</strong></td>
+                <td class="texto-izq"><strong>Ampliado (Lote 25x)</strong></td>
                 <td>6</td>
-                <td>5,41 s</td>
-                <td>2,12</td>
+                <td>5,98 s</td>
+                <td>3,01</td>
             </tr>
         </tbody>
     </table>
 
-    <h3>Ejemplo de reparto de bloques por hilo (Ampliado 100x con 6 hilos)</h3>
+    <h3>Ejemplo de reparto de bloques por hilo (Ampliado 25x con 6 hilos)</h3>
     <p>
-        En el lote ampliado hay 100 imágenes de 64 bloques, es decir, <strong>6400 tareas</strong>. Cada tarea se identifica por un número, del que se obtiene la imagen y el bloque: <code>imagen = tarea / 64</code> y <code>bloque = tarea % 64</code>. Con 6 hilos, 6400 / 6 = 1066 con residuo 4, por lo que los 4 primeros hilos procesan un bloque más. Cada hilo trabaja el equivalente a unas <strong>16,7 imágenes completas</strong>:
+        En el lote ampliado hay 25 imágenes de 64 bloques, es decir, <strong>1600 tareas</strong>. Cada tarea se identifica por un número, del que se obtiene la imagen y el bloque: <code>imagen = tarea / 64</code> y <code>bloque = tarea % 64</code>. Con 6 hilos, 1600 / 6 = 266 con residuo 4, por lo que los 4 primeros hilos procesan un bloque más. Cada hilo trabaja el equivalente a unas <strong>4,2 imágenes completas</strong>:
     </p>
 
     <table>
@@ -360,30 +360,30 @@ threshold(magnitud, bordes, 50, 255, THRESH_BINARY);  // máscara binaria de bor
             </tr>
         </thead>
         <tbody>
-            <tr><td>Hilo-1</td><td>0, 6, 12, 18, ...</td><td>1067</td><td>16,67</td><td>5,11 s</td></tr>
-            <tr><td>Hilo-2</td><td>1, 7, 13, 19, ...</td><td>1067</td><td>16,67</td><td>5,41 s</td></tr>
-            <tr><td>Hilo-3</td><td>2, 8, 14, 20, ...</td><td>1067</td><td>16,67</td><td>5,29 s</td></tr>
-            <tr><td>Hilo-4</td><td>3, 9, 15, 21, ...</td><td>1067</td><td>16,67</td><td>5,24 s</td></tr>
-            <tr><td>Hilo-5</td><td>4, 10, 16, 22, ...</td><td>1066</td><td>16,66</td><td>5,16 s</td></tr>
-            <tr><td>Hilo-6</td><td>5, 11, 17, 23, ...</td><td>1066</td><td>16,66</td><td>5,30 s</td></tr>
+            <tr><td>Hilo-1</td><td>0, 6, 12, 18, ...</td><td>267</td><td>4,17</td><td>4,84 s</td></tr>
+            <tr><td>Hilo-2</td><td>1, 7, 13, 19, ...</td><td>267</td><td>4,17</td><td>5,64 s</td></tr>
+            <tr><td>Hilo-3</td><td>2, 8, 14, 20, ...</td><td>267</td><td>4,17</td><td>4,51 s</td></tr>
+            <tr><td>Hilo-4</td><td>3, 9, 15, 21, ...</td><td>267</td><td>4,17</td><td>5,91 s</td></tr>
+            <tr><td>Hilo-5</td><td>4, 10, 16, 22, ...</td><td>266</td><td>4,16</td><td>5,91 s</td></tr>
+            <tr><td>Hilo-6</td><td>5, 11, 17, 23, ...</td><td>266</td><td>4,16</td><td>5,86 s</td></tr>
         </tbody>
     </table>
     <p>
-        Por ejemplo, la tarea 70 la procesa el Hilo-5 (70 % 6 = 4) y corresponde a la <strong>imagen 2, bloque 6</strong> (70 / 64 = 1, 70 % 64 = 6). Los tiempos de los 6 hilos son muy parecidos (entre 5,1 y 5,4 segundos), lo que muestra que el reparto cíclico equilibra bien la carga. Así se muestra en la consola:
+        Por ejemplo, la tarea 70 la procesa el Hilo-5 (70 % 6 = 4) y corresponde a la <strong>imagen 2, bloque 6</strong> (70 / 64 = 1, 70 % 64 = 6). Aunque todos los hilos reciben casi la misma cantidad de bloques, sus tiempos varían entre 4,51 s y 5,91 s: con 6 hilos y solo 4 núcleos físicos, algunos hilos comparten núcleo y avanzan más lento que otros. Así se muestra en la consola:
     </p>
     <pre><code>  ▶ PARALELO (6 hilos)
     ------------------------------------------------
     Hilo         | Bloques    | Tiempo (ms)
     ------------------------------------------------
-    Hilo-1       | 1067       |            5105,00
-    Hilo-2       | 1067       |            5411,63
-    Hilo-3       | 1067       |            5294,63
-    Hilo-4       | 1067       |            5242,36
-    Hilo-5       | 1066       |            5155,02
-    Hilo-6       | 1066       |            5301,58
+    Hilo-1       | 267        |            4838,04
+    Hilo-2       | 267        |            5637,72
+    Hilo-3       | 267        |            4509,86
+    Hilo-4       | 267        |            5910,74
+    Hilo-5       | 266        |            5910,45
+    Hilo-6       | 266        |            5859,15
     ------------------------------------------------
-    Bloques: 6400 | min 1,76 ms | prom 4,92 ms | max 21,51 ms
-    Promedio: 5409,18 ms</code></pre>
+    Bloques: 1600 | min 13,56 ms | prom 20,40 ms | max 40,78 ms
+    Promedio: 5975,96 ms</code></pre>
 
     <h3>Imagen de entrada y salida</h3>
     <div class="imagenes">
@@ -405,22 +405,22 @@ threshold(magnitud, bordes, 50, 255, THRESH_BINARY);  // máscara binaria de bor
 
     <div class="pregunta">1. ¿Qué diferencias se observan entre los tiempos de ejecución secuencial y paralela?</div>
     <p>
-        La versión paralela siempre fue más rápida. En la imagen original el tiempo bajó de 102,27 ms a 52,06 ms con 6 hilos, y en el lote ampliado pasó de 11,48 s a 5,41 s, reduciendo el tiempo a menos de la mitad.
+        La versión paralela siempre fue más rápida. En la imagen original el tiempo bajó de 758,16 ms a 219,26 ms con 6 hilos, y en el lote ampliado pasó de 18,02 s a 5,98 s, reduciendo el tiempo aproximadamente a un tercio.
     </p>
 
     <div class="pregunta">2. ¿Cómo influye el número de hilos en el rendimiento?</div>
     <p>
-        Al pasar de 1 a 2 hilos se obtiene la mayor mejora (1,68x en el ampliado), pero de 2 a 4 y de 4 a 6 la ganancia es cada vez menor. La causa es que OpenCV procesa cada bloque muy rápido (alrededor de 2 ms), por lo que el límite deja de ser la CPU y pasa a ser el <strong>ancho de banda de la memoria RAM</strong>: todos los hilos compiten por leer la imagen y escribir la máscara. Esto se ve en que el tiempo promedio por bloque sube de 2,00 ms con 1 hilo a 4,92 ms con 6 hilos. Además, el procesador tiene solo 4 núcleos físicos, así que con 6 hilos dos de ellos comparten núcleo mediante <em>Hyper-Threading</em>.
+        Al pasar de 1 a 2 hilos el tiempo casi se reduce a la mitad (1,87x en la original y 1,92x en el ampliado), y con 4 hilos se llega a 3,20x en la original. Sin embargo, de 4 a 6 hilos la ganancia es pequeña (de 3,20x a 3,46x), porque el procesador tiene solo <strong>4 núcleos físicos</strong>: los hilos adicionales comparten núcleo mediante <em>Hyper-Threading</em> y además compiten por el acceso a la memoria. Esto se refleja en el tiempo promedio por bloque del lote ampliado, que sube de 11,41 ms con 1 hilo a 20,40 ms con 6 hilos.
     </p>
 
     <div class="pregunta">3. ¿Qué sucede al incrementar el tamaño de los datos?</div>
     <p>
-        Con el lote de 100 imágenes el tiempo secuencial crece de forma proporcional (unas 112 veces el de una sola imagen) y el <em>speedup</em> mejora en todas las configuraciones (por ejemplo, de 1,72 a 1,91 con 4 hilos). Con más trabajo, el costo fijo de crear y sincronizar los hilos se vuelve despreciable frente al tiempo de procesamiento útil.
+        Con el lote de 25 imágenes el tiempo secuencial crece de forma proporcional (unas 24 veces el de una sola imagen). Con 2 hilos el <em>speedup</em> mejora ligeramente (de 1,87 a 1,92), ya que el costo fijo de crear los hilos se vuelve despreciable. Con 4 y 6 hilos el <em>speedup</em> es algo menor que en la imagen original (2,82 frente a 3,20 con 4 hilos), porque al procesar unos 900 millones de píxeles los hilos compiten más por la memoria RAM.
     </p>
 
     <div class="pregunta">4. ¿El procesamiento paralelo siempre es más rápido? Justifique su respuesta.</div>
     <p>
-        No. Crear los hilos con <code>start()</code> y esperarlos con <code>join()</code> tiene un costo fijo; si la imagen fuera pequeña, ese costo podría superar el tiempo de procesarla de forma secuencial. Además, como se observó, cuando la tarea está limitada por la memoria, agregar más hilos deja de aportar porque todos compiten por el mismo recurso.
+        No. Crear los hilos con <code>start()</code> y esperarlos con <code>join()</code> tiene un costo fijo; si la imagen fuera pequeña, ese costo podría superar el tiempo de procesarla de forma secuencial. Además, usar más hilos que núcleos físicos aporta poco, como se vio al pasar de 4 a 6 hilos.
     </p>
 
     <!-- 5. Conclusiones -->
@@ -430,10 +430,10 @@ threshold(magnitud, bordes, 50, 255, THRESH_BINARY);  // máscara binaria de bor
             <strong>Descomposición con halo:</strong> Dividir la imagen en bloques permite procesarlos de forma independiente, pero los filtros necesitan los píxeles vecinos. El halo de 3 píxeles resolvió este problema y la imagen reconstruida no presenta cortes en las uniones.
         </li>
         <li>
-            <strong>Uso de JavaCV y Java Threads:</strong> JavaCV permitió aplicar todo el pipeline (grises, Gauss, Sobel y umbral) con funciones optimizadas de OpenCV, mientras que <code>extends Thread</code> con <code>start()</code> y <code>join()</code> controló el paralelismo de forma simple y sin bloqueos, ya que cada bloque escribe en una zona distinta de la imagen.
+            <strong>Uso directo de Java Threads:</strong> Extender de <code>Thread</code> y coordinar con <code>start()</code> y <code>join()</code> permitió controlar el paralelismo de forma simple y sin bloqueos, ya que cada bloque escribe en una zona distinta de la imagen.
         </li>
         <li>
-            <strong>Límite del hardware:</strong> La aceleración máxima fue de 2,12x con 6 hilos en el lote ampliado. Al ser OpenCV tan eficiente, el cuello de botella fue el acceso a memoria y no el cálculo, lo que demuestra que el paralelismo rinde más cuando cada tarea tiene una carga de cómputo alta en relación con los datos que mueve.
+            <strong>Límite del hardware:</strong> La aceleración máxima fue de 3,46x con 6 hilos en la imagen original, cercana a los 4 núcleos físicos del procesador. Pasado ese número de núcleos, agregar hilos aporta poco, lo que demuestra que el rendimiento paralelo depende directamente de los recursos físicos disponibles.
         </li>
     </ul>
 

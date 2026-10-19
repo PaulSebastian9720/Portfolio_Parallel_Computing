@@ -1,7 +1,5 @@
 package ups.edu.ec;
 
-import org.bytedeco.opencv.opencv_core.Mat;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -18,13 +16,13 @@ public class TaskWorker extends Thread {
 
     private final int id;
     private final int numHilos;
-    private final ImageProcessor procesador;
-    private final Mat[] mascaras;
+    private final ImageProcessorJava procesador;
+    private final byte[][] mascaras;
 
     private final List<Long> tiemposBloque = new ArrayList<>();   // nanos de cada bloque procesado
     private long tiempoTotalNs;
 
-    public TaskWorker(int id, int numHilos, ImageProcessor procesador, Mat[] mascaras) {
+    public TaskWorker(int id, int numHilos, ImageProcessorJava procesador, byte[][] mascaras) {
         super("Hilo-" + (id + 1));
         this.id = id;
         this.numHilos = numHilos;
@@ -34,7 +32,7 @@ public class TaskWorker extends Thread {
 
     @Override
     public void run() {
-        List<ImageProcessor.Block> bloques = procesador.getBloques();
+        List<ImageProcessorJava.Block> bloques = procesador.getBloques();
         int totalTareas = mascaras.length * bloques.size();
 
         long inicioHilo = System.nanoTime();
