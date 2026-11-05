@@ -1,5 +1,4 @@
-// Ejecuta una prueba o un experimento de la práctica e imprime una tabla separada por
-// tabuladores, para copiarla directamente en Excel.
+// Ejecuta una prueba o un experimento e imprime una tabla separada por tabuladores.
 //   ./ConvolucionImagenes manual | no_multiplo | filtro | resolucion | mascara | hilos
 
 #include "comun.h"
@@ -67,7 +66,7 @@ double medirCPU(const vector<float>& imagen, vector<float>& salida, int ancho, i
 }
 
 // Mide cada configuración en CPU y GPU: una ejecución de calentamiento descartada y
-// REPETICIONES medidas. Después compara ambas salidas y guarda la imagen filtrada.
+// REPETICIONES medidas. Después compara ambas salidas y guarda las dos imágenes filtradas.
 void ejecutarExperimento(const string& nombre, const vector<Configuracion>& configuraciones) {
     std::filesystem::create_directories(DIR_SALIDAS);
 
@@ -98,8 +97,9 @@ void ejecutarExperimento(const string& nombre, const vector<Configuracion>& conf
         fflush(stdout);
 
         errores.push_back(comparar(cpu, gpu));
-        const string archivo = c.filtro + "_k" + std::to_string(c.k) + "_" + std::to_string(c.resolucion) + ".pgm";
-        guardarPGM(DIR_SALIDAS + archivo, cpu, ancho, alto, c.filtro == "laplaciano");
+        const string base = c.filtro + "_k" + std::to_string(c.k) + "_" + std::to_string(c.resolucion);
+        guardarPGM(DIR_SALIDAS + base + ".pgm", cpu, ancho, alto, c.filtro == "laplaciano");
+        guardarPGM(DIR_SALIDAS + base + "_gpu.pgm", gpu, ancho, alto, c.filtro == "laplaciano");
     }
 
     printf("\n=== EXPERIMENTO %s: VALIDACION CPU vs GPU (tolerancia %.2f) ===\n", nombre.c_str(), TOLERANCIA);

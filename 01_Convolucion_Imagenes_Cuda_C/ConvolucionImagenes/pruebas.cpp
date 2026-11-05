@@ -24,7 +24,7 @@ ErrorNumerico comparar(const vector<float>& cpu, const vector<float>& gpu) {
     return error;
 }
 
-// Comprueba valores calculados a mano sobre la matriz de la Figura 1 de la guía.
+// Comprueba valores calculados a mano sobre una matriz de 5x5.
 // En los bordes, los vecinos fuera de la imagen valen 0.
 // Ejemplo, nitidez en (0,0): 5*35 - 40 (derecha) - 40 (abajo) = 95.
 static void ejecutarCasosManuales(bool usarGpu) {

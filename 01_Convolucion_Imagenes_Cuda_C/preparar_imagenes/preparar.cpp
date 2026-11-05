@@ -1,10 +1,9 @@
-// Programa aparte para preparar las entradas: único lugar donde se usa OpenCV.
-// Se ejecuta una vez, antes de los experimentos, y no forma parte de las mediciones.
+// Genera las imágenes de entrada de 2000, 4000 y 6000 píxeles.
 //
 // Compilar y ejecutar desde 01_Convolucion_Imagenes_Cuda_C/:
-//   g++ -std=c++20 -O2 preparar_imagenes/preparar.cpp -o preparar_imagenes/preparar \
-//       $(pkg-config --cflags --libs opencv4)
-//   ./preparar_imagenes/preparar imagenes/foto.jpg imagenes
+//   cmake -S preparar_imagenes -B preparar_imagenes/build -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake
+//   cmake --build preparar_imagenes/build --config Release
+//   .\preparar_imagenes\build\Release\preparar.exe imagenes\foto.jpg imagenes
 //
 // Pasos: escala de grises -> recorte cuadrado central -> reducción con INTER_AREA,
 // que promedia los píxeles de origen y evita artefactos al reducir.

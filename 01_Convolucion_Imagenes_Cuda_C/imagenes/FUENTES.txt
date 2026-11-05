@@ -1,0 +1,28 @@
+BANCO DE IMAGENES CANDIDATAS
+Fuente: Wikimedia Commons. Datos consultados el 2026-11-04.
+Todas tienen ambos lados de al menos 6000 pixeles.
+Antes de citar una imagen, confirmar su autor y licencia en su pagina.
+
+1. Quezon City skyline (West Triangle), octubre de 2025
+   Tamano: 8064x6048, 8 MB
+   Autor: RFNirmala
+   Licencia: CC0
+   Enlace: https://commons.wikimedia.org/wiki/File:Quezon_City_skyline_(West_Triangle)_Oct2025.jpg
+
+2. City of London buildings, 15 de marzo de 2025
+   Tamano: 6144x8160, 10,5 MB
+   Autor: Andy Li
+   Licencia: CC0
+   Enlace: https://commons.wikimedia.org/wiki/File:City_of_London_buildings_2025-03-15.jpg
+
+3. Riga Cathedral Nave, Riga, Letonia
+   Tamano: 6453x6530, 10,7 MB
+   Autor: Diliff
+   Licencia: CC BY-SA 3.0
+   Enlace: https://commons.wikimedia.org/wiki/File:Riga_Cathedral_Nave,_Riga,_Latvia_-_Diliff.jpg
+
+4. Kozjak mountain 03
+   Tamano: 9248x6936, 10,1 MB
+   Autor: Geograf208
+   Licencia: CC BY-SA 4.0
+   Enlace: https://commons.wikimedia.org/wiki/File:Kozjak_mountain_03.jpg

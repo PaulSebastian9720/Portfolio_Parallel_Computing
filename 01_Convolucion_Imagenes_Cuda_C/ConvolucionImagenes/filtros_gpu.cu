@@ -3,7 +3,7 @@
 #include <cstdio>
 #include <cstdlib>
 
-// Termina el programa con un mensaje claro si una llamada a CUDA falla.
+// Termina el programa si una llamada a CUDA falla.
 static void revisar(cudaError_t error, const char* operacion) {
     if (error != cudaSuccess) {
         printf("Error de CUDA en %s: %s\n", operacion, cudaGetErrorString(error));
@@ -66,37 +66,37 @@ TiemposGpu convolucionGPU(const float* entrada, float* salida, int ancho, int al
     revisar(cudaMemcpy(gpuMascara, mascara, bytesMascara, cudaMemcpyHostToDevice), "copiar mascara");
 
     cudaEvent_t inicio, trasEntrada, trasKernel, fin;
-    cudaEventCreate(&inicio);
-    cudaEventCreate(&trasEntrada);
-    cudaEventCreate(&trasKernel);
-    cudaEventCreate(&fin);
+    revisar(cudaEventCreate(&inicio), "crear evento");
+    revisar(cudaEventCreate(&trasEntrada), "crear evento");
+    revisar(cudaEventCreate(&trasKernel), "crear evento");
+    revisar(cudaEventCreate(&fin), "crear evento");
 
-    cudaEventRecord(inicio);
+    revisar(cudaEventRecord(inicio), "registrar evento");
     revisar(cudaMemcpy(gpuEntrada, entrada, bytesImagen, cudaMemcpyHostToDevice), "copiar CPU a GPU");
-    cudaEventRecord(trasEntrada);
+    revisar(cudaEventRecord(trasEntrada), "registrar evento");
 
     kernelConvolucion<<<bloques, hilosPorBloque>>>(gpuEntrada, gpuSalida, gpuMascara, ancho, alto, k);
     revisar(cudaGetLastError(), "lanzar kernel");
-    cudaEventRecord(trasKernel);
+    revisar(cudaEventRecord(trasKernel), "registrar evento");
 
     revisar(cudaMemcpy(salida, gpuSalida, bytesImagen, cudaMemcpyDeviceToHost), "copiar GPU a CPU");
-    cudaEventRecord(fin);
+    revisar(cudaEventRecord(fin), "registrar evento");
     revisar(cudaEventSynchronize(fin), "sincronizar");
 
     TiemposGpu t;
     t.bloques = bloques;
-    cudaEventElapsedTime(&t.cpuGpu, inicio, trasEntrada);
-    cudaEventElapsedTime(&t.kernel, trasEntrada, trasKernel);
-    cudaEventElapsedTime(&t.gpuCpu, trasKernel, fin);
-    cudaEventElapsedTime(&t.total, inicio, fin);
+    revisar(cudaEventElapsedTime(&t.cpuGpu, inicio, trasEntrada), "leer tiempo");
+    revisar(cudaEventElapsedTime(&t.kernel, trasEntrada, trasKernel), "leer tiempo");
+    revisar(cudaEventElapsedTime(&t.gpuCpu, trasKernel, fin), "leer tiempo");
+    revisar(cudaEventElapsedTime(&t.total, inicio, fin), "leer tiempo");
 
-    cudaEventDestroy(inicio);
-    cudaEventDestroy(trasEntrada);
-    cudaEventDestroy(trasKernel);
-    cudaEventDestroy(fin);
-    cudaFree(gpuEntrada);
-    cudaFree(gpuSalida);
-    cudaFree(gpuMascara);
+    revisar(cudaEventDestroy(inicio), "destruir evento");
+    revisar(cudaEventDestroy(trasEntrada), "destruir evento");
+    revisar(cudaEventDestroy(trasKernel), "destruir evento");
+    revisar(cudaEventDestroy(fin), "destruir evento");
+    revisar(cudaFree(gpuEntrada), "liberar entrada");
+    revisar(cudaFree(gpuSalida), "liberar salida");
+    revisar(cudaFree(gpuMascara), "liberar mascara");
 
     return t;
 }

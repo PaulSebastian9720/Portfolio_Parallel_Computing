@@ -1,4 +1,4 @@
-# ─── Build artifacts ───────────────────────────────────────────────────────────
+# Compilación
 cmake-build-debug/
 cmake-build-release/
 build/
@@ -7,12 +7,12 @@ build/
 *.so
 *.out
 
-# ─── CUDA compiled objects ─────────────────────────────────────────────────────
+# Objetos de CUDA
 *.ptx
 *.cubin
 *.fatbin
 
-# ─── IDE / editor ──────────────────────────────────────────────────────────────
+# Editores
 .idea/
 *.iml
 .vscode/
@@ -20,18 +20,26 @@ build/
 *.swo
 *~
 
-# ─── CMake generated ───────────────────────────────────────────────────────────
+# CMake
 CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
 Makefile
 
-# ─── Large image files (evitar subir binarios pesados al repo) ─────────────────
+# Imágenes pesadas
 imagenes/*.pgm
 imagenes/*.jpg
 imagenes/*.png
 imagenes/*.bmp
+salidas/
 
-# ─── OS ────────────────────────────────────────────────────────────────────────
+# Sistema operativo
 .DS_Store
 Thumbs.db
+
+# Informe, resultados y archivos de trabajo
+Informe_LaTeX/
+informe.docx
+resultados/
+PASOS.txt
+OfficeSetup.exe

@@ -20,7 +20,7 @@ std::vector<float> crearMascara(const std::string& filtro, int k) {
     return std::vector<float>(k * k, 1.0f / (k * k));
 }
 
-// Convolución secuencial: referencia de corrección y de aceleración.
+// Convolución secuencial.
 // Extensión con ceros: un vecino fuera de la imagen aportaría 0, así que se omite.
 void convolucionCPU(const float* entrada, float* salida, int ancho, int alto,
                     const float* mascara, int k) {
