@@ -1,0 +1,19 @@
+# ─── Entorno virtual y dependencias ──────────────────────────────────────────
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+
+# ─── Imágenes pesadas (se obtienen de imagenes.zip de la práctica 01) ─────────
+imagenes/
+salidas/
+
+# ─── IDE / editor ─────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*~
+
+# ─── OS ──────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
