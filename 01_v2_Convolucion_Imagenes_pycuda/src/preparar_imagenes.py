@@ -1,13 +1,6 @@
-"""Prepara las imágenes de entrada (equivale a preparar_imagenes/preparar.cpp).
+"""Genera las imágenes de entrada a partir de la foto (equivale a preparar.cpp).
 
-Se ejecuta una vez, antes de los experimentos, y no forma parte de las mediciones. Es el
-único lugar donde se usa OpenCV (solo para leer, convertir y escribir imágenes).
-
-Uso:
     uv run src/preparar_imagenes.py imagenes/foto.jpg imagenes
-
-Pasos: escala de grises -> recorte cuadrado central -> reducción con INTER_AREA, que
-promedia los píxeles de origen y evita artefactos al reducir.
 """
 
 import sys
@@ -15,14 +8,14 @@ from pathlib import Path
 
 import cv2
 
-RESOLUCIONES = (2000, 4000, 6000)
+# 2000, 4000 y 6000 son las de la práctica 01. 500 sirve para la comparación completa
+# de las cuatro versiones, donde Python secuencial sí alcanza a terminar.
+RESOLUCIONES = (500, 2000, 4000, 6000)
 
 
-# Genera img_2000.pgm, img_4000.pgm e img_6000.pgm a partir de una foto.
-# Parámetros:
-#   origen   ruta de la imagen original (debe medir al menos 6000x6000 tras el recorte)
-#   destino  carpeta donde se escriben los PGM
-# Retorna: 0 si todo salió bien, 1 si hubo un error.
+# Escala de grises, recorte cuadrado central y reducción a cada resolución con
+# INTER_AREA, que promedia los píxeles de origen. Se ejecuta una vez, fuera de las
+# mediciones; OpenCV solo se usa aquí y en a_png.py.
 def preparar(origen, destino):
     gris = cv2.imread(str(origen), cv2.IMREAD_GRAYSCALE)
     if gris is None:

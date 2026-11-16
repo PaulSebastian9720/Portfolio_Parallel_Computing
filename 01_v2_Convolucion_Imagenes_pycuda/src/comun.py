@@ -1,26 +1,16 @@
-"""Constantes, estructuras de datos y utilidades compartidas (equivale a comun.h y a
-las funciones de lectura/escritura de main.cu de la práctica 01).
-
-Tipos usados en todo el programa: las imágenes y máscaras son arreglos NumPy de tipo
-np.float32 (float de 32 bits, igual que el float de C/CUDA) y contiguos en memoria
-(orden C, fila tras fila), que es la disposición que espera el kernel.
-"""
+"""Tipos, máscaras, lectura/escritura de PGM y comparación de salidas."""
 
 from dataclasses import dataclass
 
 import numpy as np
 
-# Error máximo admitido entre implementaciones, en escala 0-255. Cota del peor caso
-# (media 21x21): 441 * 255 * 1.19e-7 = 0.013; y 0.02 es muy inferior a un nivel de gris.
+# Error admitido entre versiones, en la escala 0-255. El peor caso es la media 21x21:
+# 441 sumas * 255 * épsilon de float32 (1.19e-7) da 0.013, y 0.02 sigue muy por debajo de
+# un nivel de gris.
 TOLERANCIA = 0.02
 
 
-# Tiempos de una ejecución en GPU, en milisegundos.
-#   cpu_gpu  copia de la imagen CPU -> GPU
-#   kernel   ejecución del kernel
-#   gpu_cpu  copia del resultado GPU -> CPU
-#   total    las tres etapas juntas
-#   bloques  bloques lanzados en la dimensión X
+# Tiempos de una ejecución en GPU, en ms; total abarca las tres etapas.
 @dataclass
 class TiemposGpu:
     cpu_gpu: float
@@ -30,10 +20,6 @@ class TiemposGpu:
     bloques: int
 
 
-# Resultado de comparar dos salidas float.
-#   maximo               error absoluto máximo
-#   medio                error absoluto medio
-#   fuera_de_tolerancia  píxeles con error > TOLERANCIA (incluye NaN)
 @dataclass
 class ErrorNumerico:
     maximo: float = 0.0
@@ -41,11 +27,8 @@ class ErrorNumerico:
     fuera_de_tolerancia: int = 0
 
 
-# Devuelve los k*k coeficientes de la máscara, fila tras fila.
-# Parámetros:
-#   filtro  "media", "nitidez" o "laplaciano"
-#   k       lado de la máscara; solo se usa en "media" (nitidez y laplaciano son 3x3)
-# Retorna: arreglo np.float32 contiguo de k*k elementos.
+# Coeficientes de la máscara fila tras fila, en float32 como el float de C. k solo se usa
+# en la media; nitidez y laplaciano son siempre 3x3.
 def crear_mascara(filtro, k):
     if filtro == "nitidez":
         valores = [0, -1, 0,
@@ -60,10 +43,8 @@ def crear_mascara(filtro, k):
     return np.ascontiguousarray(valores, dtype=np.float32)
 
 
-# Lee un PGM binario (P5) de 8 bits generado por preparar_imagenes.py (o preparar.cpp).
-# Parámetros:
-#   ruta  ruta del archivo .pgm
-# Retorna: (imagen, ancho, alto); imagen es un arreglo plano np.float32 de ancho*alto.
+# Lee un PGM de 8 bits y lo devuelve como arreglo plano float32 (fila tras fila), que es
+# la forma en que el kernel recorre la imagen.
 def leer_pgm(ruta):
     with open(ruta, "rb") as archivo:
         cabecera = []
@@ -83,14 +64,9 @@ def leer_pgm(ruta):
     return bytes_imagen.astype(np.float32), ancho, alto
 
 
-# Convierte el resultado numérico a 8 bits y lo guarda como PGM. Media y nitidez se
-# recortan a [0, 255]. En el laplaciano se usa el valor absoluto, porque sus respuestas
-# negativas también indican cambios de intensidad. Se hace después de validar los floats.
-# Parámetros:
-#   ruta      archivo de destino
-#   valores   arreglo plano float32 de ancho*alto
-#   ancho, alto  dimensiones
-#   absoluto  True para aplicar valor absoluto antes de recortar
+# Pasa el resultado a 8 bits para verlo: redondea y recorta a [0, 255]. En el laplaciano
+# (absoluto=True) se toma antes el valor absoluto, porque un valor negativo también es un
+# borde. Solo se usa para guardar imágenes; la validación compara los float sin recortar.
 def guardar_pgm(ruta, valores, ancho, alto, absoluto):
     datos = np.abs(valores) if absoluto else valores
     bytes_imagen = np.clip(np.rint(datos), 0, 255).astype(np.uint8)
@@ -99,12 +75,8 @@ def guardar_pgm(ruta, valores, ancho, alto, absoluto):
         archivo.write(bytes_imagen.tobytes())
 
 
-# Compara dos salidas float antes de convertirlas a 8 bits. NumPy solo se usa aquí para
-# calcular el error, no para la convolución. Las diferencias NaN (píxeles que ningún
-# hilo calculó) cuentan como fuera de tolerancia y no entran en máximo ni medio.
-# Parámetros:
-#   referencia, otra  arreglos float32 del mismo tamaño
-# Retorna: ErrorNumerico.
+# Error absoluto máximo y medio entre dos salidas float, y píxeles por encima de la
+# tolerancia. Un NaN es un píxel que ningún hilo escribió: cuenta como fuera.
 def comparar(referencia, otra):
     diferencia = np.abs(referencia.astype(np.float64) - otra.astype(np.float64))
     validos = ~np.isnan(diferencia)

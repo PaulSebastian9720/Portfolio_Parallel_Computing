@@ -1,22 +1,36 @@
-# ─── Entorno virtual y dependencias ──────────────────────────────────────────
+# Entorno virtual y dependencias
 .venv/
 __pycache__/
 *.pyc
 *.egg-info/
 
-# ─── Imágenes pesadas (se obtienen de imagenes.zip de la práctica 01) ─────────
+# Imágenes de entrada (se generan con preparar_imagenes.py) y salidas filtradas
 imagenes/
 salidas/
 
-# ─── IDE / editor ─────────────────────────────────────────────────────────────
+# Herramienta puente compilada
+referencia_c/build/
+
+# Ejecuciones descartadas y registros de consola
+resultados/consola/
+
+# Informe y herramienta de referencia: no se suben al repositorio
+Informe_LaTeX/
+referencia_c/
+
+# Resultados: solo se sube resultados.xlsx
+resultados/*
+!resultados/resultados.xlsx
+
+# Guía, presentación y documentos de trabajo
+*.pdf
+*.pptx
+*.docx
+
+# IDE y sistema operativo
 .idea/
 .vscode/
 *.swp
 *~
-
-# ─── Informes / PDFs ─────────────────────────────────────────────────────────
-*.pdf
-
-# ─── OS ──────────────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db

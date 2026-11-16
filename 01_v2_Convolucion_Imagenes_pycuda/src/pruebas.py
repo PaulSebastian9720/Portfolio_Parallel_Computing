@@ -1,9 +1,10 @@
-"""Pruebas de corrección (equivale a pruebas.cpp de la práctica 01)."""
+"""Pruebas de corrección: matriz calculada a mano y tamaño no múltiplo de los hilos."""
 
 import numpy as np
 
-from comun import comparar, crear_mascara
+from comun import comparar, crear_mascara, guardar_pgm
 from filtros_cpu import convolucion_python
+from referencia_c import DIR_TEMPORAL, ejecutar_puente
 
 # Matriz de la Figura 1 de la guía (5x5), fila tras fila.
 MATRIZ_FIGURA = np.array([
@@ -18,10 +19,9 @@ MATRIZ_FIGURA = np.array([
 MASCARA_FIGURA = np.array([-2, -1, 0, -1, 1, 1, 0, 1, 2], dtype=np.float32)
 
 
-# Devuelve los casos calculados a mano sobre la matriz de la Figura 1. En los bordes,
-# los vecinos fuera de la imagen valen 0.
-# Ejemplo, nitidez en (0,0): 5*35 - 40 (derecha) - 40 (abajo) = 95.
-# Retorna: lista de tuplas (nombre, mascara, fila, col, esperado).
+# Valores calculados a mano sobre la matriz de la Figura 1, incluidos píxeles de borde.
+# Ejemplo, nitidez en (0,0): 5*35 - 40 (derecha) - 40 (abajo) = 95; los vecinos de fuera
+# valen 0.
 def casos_manuales():
     nitidez = crear_mascara("nitidez", 3)
     laplaciano = crear_mascara("laplaciano", 3)
@@ -40,9 +40,7 @@ def casos_manuales():
     ]
 
 
-# Ejecuta los casos manuales con una implementación e imprime una fila por caso.
-# Parámetros:
-#   gpu  objeto GpuConvolucion para usar PyCUDA, o None para usar Python secuencial
+# gpu=None prueba Python secuencial; con un GpuConvolucion prueba PyCUDA (128 hilos).
 def ejecutar_casos_manuales(gpu):
     for nombre, mascara, fila, col, esperado in casos_manuales():
         if gpu is not None:
@@ -55,9 +53,6 @@ def ejecutar_casos_manuales(gpu):
               f"{esperado:.4f}\t{obtenido:.4f}\t{'OK' if correcto else 'FALLO'}")
 
 
-# Prueba pequeña: comprueba a mano Python secuencial y PyCUDA.
-# Parámetros:
-#   gpu  objeto GpuConvolucion ya inicializado
 def prueba_manual(gpu):
     print("=== PRUEBA MANUAL ===")
     print("impl\tprueba\tfila\tcol\tesperado\tobtenido\testado")
@@ -65,23 +60,35 @@ def prueba_manual(gpu):
     ejecutar_casos_manuales(gpu)
 
 
-# Prueba de límites: imagen de 1003x997, cuyos píxeles no son múltiplo de los hilos por
-# bloque. Compara PyCUDA contra Python secuencial con 128, 256 y 512 hilos.
-# Parámetros:
-#   gpu  objeto GpuConvolucion ya inicializado
+# Prueba de límites con una imagen de 1003x997: sus píxeles no son múltiplo de 128, 256 ni
+# 512, así que al último bloque siempre le sobran hilos. La salida de la GPU empieza en NaN;
+# si un píxel queda sin calcular, la comparación lo cuenta como fuera de tolerancia.
+# Python, CUDA C y PyCUDA se comparan contra C/C++.
 def prueba_no_multiplo(gpu):
     print("=== TAMANO NO MULTIPLO ===")
     ancho, alto = 1003, 997
     imagen = np.array([(i * 37) % 256 for i in range(ancho * alto)], dtype=np.float32)
     mascara = crear_mascara("media", 3)
 
-    print("(calculando la referencia en Python secuencial...)", flush=True)
-    referencia = convolucion_python(imagen, ancho, alto, mascara, 3)
+    ruta = DIR_TEMPORAL / "no_multiplo.pgm"
+    DIR_TEMPORAL.mkdir(parents=True, exist_ok=True)
+    guardar_pgm(ruta, imagen, ancho, alto, False)
 
-    print("imagen\thilos\tbloques\terror_maximo\terror_medio\tpixeles_fuera\testado")
+    print("(calculando Python secuencial completo...)", flush=True)
+    salida_python = convolucion_python(imagen, ancho, alto, mascara, 3)
+
+    print("imagen	version	hilos	bloques	error_maximo	error_medio	pixeles_fuera	estado")
     for hilos in (128, 256, 512):
-        salida, tiempos = gpu.convolucion(imagen, mascara, ancho, alto, 3, hilos)
-        error = comparar(referencia, salida)
-        estado = "OK" if error.fuera_de_tolerancia == 0 else "FALLO"
-        print(f"{ancho}x{alto}\t{hilos}\t{tiempos.bloques}\t{error.maximo:.6f}\t"
-              f"{error.medio:.6f}\t{error.fuera_de_tolerancia}\t{estado}")
+        salida_c, salida_cuda_c, _ = ejecutar_puente("media", 3, ruta, hilos, 0)
+        salida_gpu, tiempos = gpu.convolucion(imagen, mascara, ancho, alto, 3, hilos)
+        casos = [("cuda_c", salida_cuda_c), ("pycuda", salida_gpu)]
+        if hilos == 128:
+            casos.insert(0, ("python", salida_python))
+        for version, salida in casos:
+            error = comparar(salida_c, salida)
+            estado = "OK" if error.fuera_de_tolerancia == 0 else "FALLO"
+            columna_hilos = "" if version == "python" else hilos
+            columna_bloques = "" if version == "python" else tiempos.bloques
+            print(f"{ancho}x{alto}	{version}	{columna_hilos}	{columna_bloques}	"
+                  f"{error.maximo:.6f}	{error.medio:.6f}	{error.fuera_de_tolerancia}	{estado}")
+    ruta.unlink()

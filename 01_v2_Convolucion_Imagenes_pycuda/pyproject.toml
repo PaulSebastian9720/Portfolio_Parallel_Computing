@@ -1,7 +1,13 @@
 [project]
 name = "01-v2-convolucion-imagenes-pycuda"
 version = "0.1.0"
-description = "Add your description here"
+description = "Convolución de imágenes con Python secuencial y PyCUDA (práctica 02)"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "matplotlib==3.11.2",
+    "numpy==2.5.5",
+    "opencv-python==5.0.0.93",
+    "openpyxl==3.1.5",
+    "pycuda==2026.1",
+]

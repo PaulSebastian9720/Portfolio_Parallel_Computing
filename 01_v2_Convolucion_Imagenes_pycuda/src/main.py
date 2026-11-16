@@ -3,12 +3,14 @@
 Imprime tablas separadas por tabuladores y guarda los registros en resultados/*.csv.
 
 Uso:
-    uv run src/main.py entorno | manual | no_multiplo | filtro | resolucion | mascara | hilos
-                   [--repeticiones N] [--limite-python SEG] [--sin-python]
+    uv run src/main.py entorno | manual | no_multiplo | comparacion | filtro | resolucion
+                       | mascara | hilos  [--repeticiones N] [--segundos-muestra S]
 """
 
 import argparse
 import csv
+import ctypes
+import math
 import os
 import platform
 import subprocess
@@ -20,9 +22,10 @@ from pathlib import Path
 import numpy as np
 
 from comun import TOLERANCIA, comparar, crear_mascara, guardar_pgm, leer_pgm
-from filtros_cpu import convolucion_python, convolucion_referencia_numpy
+from filtros_cpu import convolucion_python
 from filtros_gpu import GpuConvolucion
 from pruebas import prueba_manual, prueba_no_multiplo
+from referencia_c import ejecutar_puente
 
 RAIZ = Path(__file__).resolve().parent.parent
 DIR_IMAGENES = RAIZ / "imagenes"
@@ -30,17 +33,14 @@ DIR_SALIDAS = RAIZ / "salidas"
 DIR_RESULTADOS = RAIZ / "resultados"
 
 COLUMNAS_MEDICIONES = ["version", "filtro", "mascara", "resolucion", "hilos", "bloques",
-                       "repeticion", "cpu_a_gpu", "kernel", "gpu_a_cpu", "total",
-                       "unidad", "estado"]
-COLUMNAS_VALIDACION = ["filtro", "mascara", "resolucion", "hilos", "referencia",
-                       "error_maximo", "error_medio", "pixeles_fuera", "estado"]
+                       "repeticion", "filas_medidas", "ms_muestra", "cpu_a_gpu", "kernel",
+                       "gpu_a_cpu", "total", "unidad", "estado"]
+COLUMNAS_VALIDACION = ["filtro", "mascara", "resolucion", "hilos", "version",
+                       "filas_comparadas", "error_maximo", "error_medio", "pixeles_fuera",
+                       "estado"]
 
 
-# Una configuración de un experimento (un solo factor cambia entre configuraciones).
-#   filtro      "media", "nitidez" o "laplaciano"
-#   k           lado de la máscara
-#   resolucion  lado de la imagen cuadrada (2000, 4000 o 6000)
-#   hilos       hilos por bloque de PyCUDA
+# Un solo factor cambia entre las configuraciones de un experimento.
 @dataclass
 class Configuracion:
     filtro: str
@@ -49,25 +49,43 @@ class Configuracion:
     hilos: int
 
 
-# Mismas configuraciones que main.cu de la práctica 01. El segundo valor indica si se
-# incluye Python secuencial (el experimento de hilos solo aplica a la GPU).
+# python: "completo", "estimado" (bloque de filas) o None.
+# c_medido: False cuando los tiempos de C/C++ y CUDA C se reutilizan de la práctica 01 y
+# el puente solo aporta la salida de referencia.
+@dataclass
+class Experimento:
+    nombre: str
+    python: str | None
+    c_medido: bool
+    configuraciones: list
+
+
+# Las configuraciones de alta resolución son las de main.cu de la práctica 01; en 500x500
+# las cuatro versiones terminan completas.
 EXPERIMENTOS = {
-    "filtro": ("FILTRO", True, [
+    "comparacion": Experimento("COMPARACION 500x500", "completo", True, [
+        Configuracion("media", 3, 500, 256),
+        Configuracion("nitidez", 3, 500, 256),
+        Configuracion("laplaciano", 3, 500, 256),
+        Configuracion("media", 9, 500, 256),
+        Configuracion("media", 21, 500, 256),
+    ]),
+    "filtro": Experimento("FILTRO", "estimado", False, [
         Configuracion("media", 3, 4000, 256),
         Configuracion("nitidez", 3, 4000, 256),
         Configuracion("laplaciano", 3, 4000, 256),
     ]),
-    "resolucion": ("RESOLUCION", True, [
+    "resolucion": Experimento("RESOLUCION", "estimado", False, [
         Configuracion("media", 9, 2000, 256),
         Configuracion("media", 9, 4000, 256),
         Configuracion("media", 9, 6000, 256),
     ]),
-    "mascara": ("MASCARA", True, [
+    "mascara": Experimento("MASCARA", "estimado", False, [
         Configuracion("media", 3, 4000, 256),
         Configuracion("media", 9, 4000, 256),
         Configuracion("media", 21, 4000, 256),
     ]),
-    "hilos": ("HILOS POR BLOQUE", False, [
+    "hilos": Experimento("HILOS POR BLOQUE", None, False, [
         Configuracion("media", 9, 4000, 128),
         Configuracion("media", 9, 4000, 256),
         Configuracion("media", 9, 4000, 512),
@@ -75,40 +93,22 @@ EXPERIMENTOS = {
 }
 
 
-# Ejecuta y cronometra una vez la convolución secuencial en Python con perf_counter.
-# Parámetros:
-#   imagen, ancho, alto, mascara, k  datos de la convolución
-#   limite_s  segundos máximos antes de interrumpir
-# Retorna: (salida o None si no terminó, milisegundos transcurridos).
-def medir_python(imagen, ancho, alto, mascara, k, limite_s):
-    inicio = time.perf_counter()
-    salida = convolucion_python(imagen, ancho, alto, mascara, k, limite_s)
-    return salida, (time.perf_counter() - inicio) * 1000
+def texto(valor):
+    if valor is None or valor == "":
+        return ""
+    return f"{float(valor):.4f}"
 
 
-# Imprime una fila de medición en pantalla y la agrega a la lista del CSV.
-# Parámetros:
-#   filas  lista donde se acumulan los diccionarios del CSV
-#   los demás: valores de cada columna (None = celda vacía)
-def registrar(filas, version, c, bloques, repeticion, cpu_gpu, kernel, gpu_cpu, total, estado):
-    fila = {
-        "version": version, "filtro": c.filtro, "mascara": c.k, "resolucion": c.resolucion,
-        "hilos": c.hilos if version == "pycuda" else "", "bloques": bloques or "",
-        "repeticion": repeticion,
-        "cpu_a_gpu": "" if cpu_gpu is None else f"{cpu_gpu:.4f}",
-        "kernel": "" if kernel is None else f"{kernel:.4f}",
-        "gpu_a_cpu": "" if gpu_cpu is None else f"{gpu_cpu:.4f}",
-        "total": f"{total:.4f}", "unidad": "ms", "estado": estado,
-    }
+def registrar(filas, c, **datos):
+    fila = {col: "" for col in COLUMNAS_MEDICIONES}
+    fila.update(filtro=c.filtro, mascara=c.k, resolucion=c.resolucion, unidad="ms")
+    for col in ("ms_muestra", "cpu_a_gpu", "kernel", "gpu_a_cpu", "total"):
+        datos[col] = texto(datos.get(col))
+    fila.update(datos)
     filas.append(fila)
     print("\t".join(str(fila[col]) for col in COLUMNAS_MEDICIONES), flush=True)
 
 
-# Escribe una lista de diccionarios en un CSV dentro de resultados/.
-# Parámetros:
-#   nombre    nombre del archivo
-#   columnas  orden de las columnas
-#   filas     lista de diccionarios
 def escribir_csv(nombre, columnas, filas):
     DIR_RESULTADOS.mkdir(exist_ok=True)
     with open(DIR_RESULTADOS / nombre, "w", newline="", encoding="utf-8") as archivo:
@@ -117,74 +117,120 @@ def escribir_csv(nombre, columnas, filas):
         escritor.writerows(filas)
 
 
-# Mide cada configuración en Python secuencial (si corresponde) y en PyCUDA: una
-# ejecución de calentamiento descartada y `repeticiones` medidas. Después valida PyCUDA
-# contra Python secuencial (o contra la referencia NumPy si Python no terminó), guarda la
-# imagen filtrada y escribe los CSV.
-#
-# Python secuencial: si el calentamiento supera el límite, la configuración se registra
-# como "no_completada" con el tiempo transcurrido y no se hacen repeticiones; no se
-# estiman tiempos.
-#
-# Parámetros:
-#   clave         nombre corto del experimento (para los archivos CSV)
-#   gpu           GpuConvolucion inicializada
-#   repeticiones  ejecuciones medidas por configuración
-#   limite_s      límite de tiempo por ejecución de Python secuencial
-#   con_python    False para saltar Python secuencial
-def ejecutar_experimento(clave, gpu, repeticiones, limite_s, con_python):
-    nombre, incluye_python, configuraciones = EXPERIMENTOS[clave]
-    con_python = con_python and incluye_python
+# Python completo: calentamiento y repeticiones; perf_counter rodea solo la convolución.
+def medir_python_completo(mediciones, c, imagen, ancho, alto, mascara, repeticiones):
+    convolucion_python(imagen, ancho, alto, mascara, c.k)
+    salida = None
+    for r in range(1, repeticiones + 1):
+        inicio = time.perf_counter()
+        salida = convolucion_python(imagen, ancho, alto, mascara, c.k)
+        ms = (time.perf_counter() - inicio) * 1000
+        registrar(mediciones, c, version="python", repeticion=r, filas_medidas=alto,
+                  total=ms, estado="ok")
+    return salida
+
+
+# Python estimado para alta resolución, donde una ejecución completa tarda de minutos a
+# horas. El calentamiento calcula 2 filas centrales y de paso da el costo por fila; con él
+# se eligen n filas para que cada repetición dure unos `segundos`. Cada repetición mide esas
+# n filas y se extrapola: (ms / n) * alto. Las filas de borde leen menos vecinos, así que
+# la estimación queda un poco por encima. El CSV guarda la muestra medida (ms_muestra) y la
+# estimación (total) con estado "estimado".
+def medir_python_estimado(mediciones, c, imagen, ancho, alto, mascara, repeticiones,
+                          segundos):
+    centro = alto // 2
+    inicio = time.perf_counter()
+    convolucion_python(imagen, ancho, alto, mascara, c.k, centro, centro + 2)
+    ms_fila = (time.perf_counter() - inicio) * 1000 / 2
+
+    n = min(alto, max(1, math.ceil(segundos * 1000 / ms_fila)))
+    fila_inicio = max(0, centro - n // 2)
+    fila_fin = fila_inicio + n
+
+    salida = None
+    for r in range(1, repeticiones + 1):
+        inicio = time.perf_counter()
+        salida = convolucion_python(imagen, ancho, alto, mascara, c.k, fila_inicio, fila_fin)
+        ms = (time.perf_counter() - inicio) * 1000
+        registrar(mediciones, c, version="python", repeticion=r, filas_medidas=n,
+                  ms_muestra=ms, total=ms / n * alto,
+                  estado="ok" if n == alto else "estimado")
+    return salida, fila_inicio, fila_fin
+
+
+# Calentamiento de la GPU: al menos 1 s y 3 ejecuciones. Con una sola no bastaba: tras
+# varios segundos solo de CPU, la GPU del portátil baja su consumo y las primeras
+# repeticiones salían hasta 3 veces más lentas.
+def calentar_gpu(gpu, imagen, mascara, ancho, alto, c):
+    inicio, ejecuciones = time.perf_counter(), 0
+    while ejecuciones < 3 or time.perf_counter() - inicio < 1.0:
+        gpu.convolucion(imagen, mascara, ancho, alto, c.k, c.hilos)
+        ejecuciones += 1
+
+
+def validar(validaciones, c, version, referencia, salida, filas_comparadas):
+    error = comparar(referencia, salida)
+    validaciones.append({
+        "filtro": c.filtro, "mascara": c.k, "resolucion": c.resolucion, "hilos": c.hilos,
+        "version": version, "filas_comparadas": filas_comparadas,
+        "error_maximo": f"{error.maximo:.6f}", "error_medio": f"{error.medio:.6f}",
+        "pixeles_fuera": error.fuera_de_tolerancia,
+        "estado": "OK" if error.fuera_de_tolerancia == 0 else "FALLO",
+    })
+
+
+# Por configuración: C/C++ y CUDA C (puente), PyCUDA y Python, en ese orden para que las
+# dos versiones GPU corran seguidas. Luego se validan Python, CUDA C y PyCUDA contra la
+# salida float de C/C++ y se guardan las imágenes de C/C++ y PyCUDA.
+def ejecutar_experimento(clave, gpu, repeticiones, segundos):
+    experimento = EXPERIMENTOS[clave]
     DIR_SALIDAS.mkdir(exist_ok=True)
 
-    print(f"=== EXPERIMENTO {nombre}: MEDICIONES (milisegundos) ===")
-    print("\t".join(COLUMNAS_MEDICIONES))
+    print(f"=== EXPERIMENTO {experimento.nombre}: MEDICIONES (milisegundos) ===")
+    print("\t".join(COLUMNAS_MEDICIONES), flush=True)
 
     mediciones, validaciones = [], []
-    for c in configuraciones:
-        imagen, ancho, alto = leer_pgm(DIR_IMAGENES / f"img_{c.resolucion}.pgm")
+    for c in experimento.configuraciones:
+        ruta = DIR_IMAGENES / f"img_{c.resolucion}.pgm"
+        imagen, ancho, alto = leer_pgm(ruta)
         mascara = crear_mascara(c.filtro, c.k)
-        salida_python = None
 
-        if con_python:
-            salida_python, ms = medir_python(imagen, ancho, alto, mascara, c.k, limite_s)
-            if salida_python is None:
-                registrar(mediciones, "python", c, None, "calentamiento", None, None, None,
-                          ms, f"no_completada (limite {limite_s:.0f} s)")
-            else:
-                for r in range(1, repeticiones + 1):
-                    salida_python, ms = medir_python(imagen, ancho, alto, mascara, c.k, limite_s)
-                    if salida_python is None:
-                        registrar(mediciones, "python", c, None, r, None, None, None,
-                                  ms, f"no_completada (limite {limite_s:.0f} s)")
-                        break
-                    registrar(mediciones, "python", c, None, r, None, None, None, ms, "ok")
+        reps_c = repeticiones if experimento.c_medido else 0
+        salida_c, salida_cuda_c, filas_c = ejecutar_puente(c.filtro, c.k, ruta, c.hilos, reps_c)
+        for version, rep, bloques, cpu_gpu, kernel, gpu_cpu, total in filas_c:
+            registrar(mediciones, c, version=version, repeticion=rep, filas_medidas=alto,
+                      hilos=c.hilos if version == "cuda_c" else "", bloques=bloques,
+                      cpu_a_gpu=cpu_gpu, kernel=kernel, gpu_a_cpu=gpu_cpu, total=total,
+                      estado="ok")
 
-        gpu.convolucion(imagen, mascara, ancho, alto, c.k, c.hilos)
+        calentar_gpu(gpu, imagen, mascara, ancho, alto, c)
         for r in range(1, repeticiones + 1):
             salida_gpu, t = gpu.convolucion(imagen, mascara, ancho, alto, c.k, c.hilos)
-            registrar(mediciones, "pycuda", c, t.bloques, r, t.cpu_gpu, t.kernel,
-                      t.gpu_cpu, t.total, "ok")
+            registrar(mediciones, c, version="pycuda", hilos=c.hilos, bloques=t.bloques,
+                      repeticion=r, filas_medidas=alto, cpu_a_gpu=t.cpu_gpu,
+                      kernel=t.kernel, gpu_a_cpu=t.gpu_cpu, total=t.total, estado="ok")
+
+        salida_python, filas = None, (0, alto)
+        if experimento.python == "completo":
+            salida_python = medir_python_completo(mediciones, c, imagen, ancho, alto,
+                                                  mascara, repeticiones)
+        elif experimento.python == "estimado":
+            salida_python, *filas = medir_python_estimado(mediciones, c, imagen, ancho, alto,
+                                                          mascara, repeticiones, segundos)
 
         if salida_python is not None:
-            referencia, tipo_referencia = salida_python, "python_secuencial"
-        else:
-            referencia = convolucion_referencia_numpy(imagen, ancho, alto, mascara, c.k)
-            tipo_referencia = "numpy_validacion"
+            desde, hasta = filas
+            validar(validaciones, c, "python", salida_c[desde * ancho:hasta * ancho],
+                    salida_python, hasta - desde)
+        validar(validaciones, c, "cuda_c", salida_c, salida_cuda_c, alto)
+        validar(validaciones, c, "pycuda", salida_c, salida_gpu, alto)
 
-        error = comparar(referencia, salida_gpu)
-        validaciones.append({
-            "filtro": c.filtro, "mascara": c.k, "resolucion": c.resolucion,
-            "hilos": c.hilos, "referencia": tipo_referencia,
-            "error_maximo": f"{error.maximo:.6f}", "error_medio": f"{error.medio:.6f}",
-            "pixeles_fuera": error.fuera_de_tolerancia,
-            "estado": "OK" if error.fuera_de_tolerancia == 0 else "FALLO",
-        })
+        base = f"{c.filtro}_k{c.k}_{c.resolucion}"
+        absoluto = c.filtro == "laplaciano"
+        guardar_pgm(DIR_SALIDAS / f"{base}_c.pgm", salida_c, ancho, alto, absoluto)
+        guardar_pgm(DIR_SALIDAS / f"{base}_pycuda.pgm", salida_gpu, ancho, alto, absoluto)
 
-        archivo = f"{c.filtro}_k{c.k}_{c.resolucion}.pgm"
-        guardar_pgm(DIR_SALIDAS / archivo, referencia, ancho, alto, c.filtro == "laplaciano")
-
-    print(f"\n=== EXPERIMENTO {nombre}: VALIDACION PyCUDA vs referencia "
+    print(f"\n=== EXPERIMENTO {experimento.nombre}: VALIDACION contra C/C++ secuencial "
           f"(tolerancia {TOLERANCIA:.2f}) ===")
     print("\t".join(COLUMNAS_VALIDACION))
     for v in validaciones:
@@ -195,8 +241,15 @@ def ejecutar_experimento(clave, gpu, repeticiones, limite_s, con_python):
     print(f"\nCSV guardados en {DIR_RESULTADOS}")
 
 
-# Devuelve el nombre del procesador (Linux: /proc/cpuinfo; otros: platform).
 def nombre_cpu():
+    if sys.platform == "win32":
+        import winreg
+        try:
+            clave = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
+                                   r"HARDWARE\DESCRIPTION\System\CentralProcessor\0")
+            return winreg.QueryValueEx(clave, "ProcessorNameString")[0].strip()
+        except OSError:
+            pass
     try:
         with open("/proc/cpuinfo", encoding="utf-8") as archivo:
             for linea in archivo:
@@ -207,8 +260,18 @@ def nombre_cpu():
     return platform.processor() or "desconocido"
 
 
-# Devuelve la RAM total en GiB, o "desconocida" si el sistema no la expone.
 def ram_total():
+    if sys.platform == "win32":
+        class Estado(ctypes.Structure):
+            _fields_ = [("dwLength", ctypes.c_ulong), ("dwMemoryLoad", ctypes.c_ulong),
+                        ("ullTotalPhys", ctypes.c_ulonglong), ("ullAvailPhys", ctypes.c_ulonglong),
+                        ("ullTotalPageFile", ctypes.c_ulonglong), ("ullAvailPageFile", ctypes.c_ulonglong),
+                        ("ullTotalVirtual", ctypes.c_ulonglong), ("ullAvailVirtual", ctypes.c_ulonglong),
+                        ("ullAvailExtendedVirtual", ctypes.c_ulonglong)]
+        estado = Estado()
+        estado.dwLength = ctypes.sizeof(Estado)
+        if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(estado)):
+            return f"{estado.ullTotalPhys / 1024 ** 3:.1f} GiB"
     try:
         bytes_ram = os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")
         return f"{bytes_ram / 1024 ** 3:.1f} GiB"
@@ -216,7 +279,6 @@ def ram_total():
         return "desconocida"
 
 
-# Devuelve la versión de nvcc (CUDA Toolkit con el que PyCUDA compila el kernel).
 def version_nvcc():
     try:
         salida = subprocess.run(["nvcc", "--version"], capture_output=True, text=True).stdout
@@ -225,10 +287,7 @@ def version_nvcc():
         return "nvcc no encontrado"
 
 
-# Imprime el equipo y las versiones que la guía pide registrar, más los tiempos de
-# preparación de la GPU (contexto y compilación del kernel).
-# Parámetros:
-#   gpu  GpuConvolucion inicializada
+# Equipo, versiones y tiempos de preparación de la GPU (contexto y compilación).
 def mostrar_entorno(gpu):
     import pycuda
     import pycuda.driver as cuda
@@ -254,16 +313,14 @@ def mostrar_entorno(gpu):
     print(f"ms_compilar_cargar_kernel\t{gpu.ms_compilacion:.4f}")
 
 
-# Lee los argumentos, inicializa la GPU una sola vez y ejecuta la opción pedida.
+# La GPU se inicializa una sola vez, antes de cualquier medición.
 def main():
     analizador = argparse.ArgumentParser(description="Práctica 02: convolución con PyCUDA")
     analizador.add_argument("opcion", choices=["entorno", "manual", "no_multiplo", *EXPERIMENTOS])
     analizador.add_argument("--repeticiones", type=int, default=5,
                             help="ejecuciones medidas tras el calentamiento (por defecto 5)")
-    analizador.add_argument("--limite-python", type=float, default=600,
-                            help="segundos máximos por ejecución de Python secuencial (por defecto 600)")
-    analizador.add_argument("--sin-python", action="store_true",
-                            help="no ejecutar Python secuencial (solo PyCUDA)")
+    analizador.add_argument("--segundos-muestra", type=float, default=5,
+                            help="duración aproximada de cada muestra de Python estimado")
     args = analizador.parse_args()
 
     gpu = GpuConvolucion()
@@ -275,8 +332,7 @@ def main():
         elif args.opcion == "no_multiplo":
             prueba_no_multiplo(gpu)
         else:
-            ejecutar_experimento(args.opcion, gpu, args.repeticiones,
-                                 args.limite_python, not args.sin_python)
+            ejecutar_experimento(args.opcion, gpu, args.repeticiones, args.segundos_muestra)
     finally:
         gpu.cerrar()
 

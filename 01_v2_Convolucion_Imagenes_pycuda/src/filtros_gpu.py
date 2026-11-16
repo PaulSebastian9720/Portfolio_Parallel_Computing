@@ -1,24 +1,4 @@
-"""Convolución en GPU con PyCUDA (equivale a convolucionGPU de filtros_gpu.cu).
-
-El programa anfitrión está en Python y el kernel sigue en CUDA C, escrito como cadena
-(KERNEL_CONVOLUCION) y compilado con SourceModule.
-Correspondencia con la API de CUDA C usada en la práctica 01:
-
-    cudaMalloc               -> cuda.mem_alloc(bytes)
-    cudaMemset               -> cuda.memset_d8(puntero, valor, bytes)
-    cudaMemcpy HostToDevice  -> cuda.memcpy_htod(destino_gpu, arreglo_numpy)
-    cudaMemcpy DeviceToHost  -> cuda.memcpy_dtoh(arreglo_numpy, origen_gpu)
-    cudaFree                 -> puntero.free()
-    cudaEvent_t / Record     -> cuda.Event() / evento.record()
-    cudaEventSynchronize     -> evento.synchronize()
-    cudaEventElapsedTime     -> inicio.time_till(fin)   (milisegundos)
-    kernel<<<b, h>>>(...)    -> funcion(..., block=(h, 1, 1), grid=(b, 1))
-
-PyCUDA también ofrece cuda.In / cuda.Out / cuda.InOut, que copian los arreglos
-automáticamente al lanzar el kernel. No se usan aquí porque las copias quedarían dentro
-de la misma llamada que el kernel, y la práctica exige medir por separado la
-transferencia CPU->GPU, el kernel y la transferencia GPU->CPU.
-"""
+"""Convolución en GPU con PyCUDA: anfitrión en Python, kernel en CUDA C."""
 
 import time
 
@@ -28,25 +8,12 @@ from pycuda.compiler import SourceModule
 
 from comun import TiemposGpu
 
-# Kernel de la práctica 01 (filtros_gpu.cu), sin cambios. SourceModule envuelve el código
-# en extern "C" para que el nombre "kernelConvolucion" no se altere y se pueda obtener
-# con get_function().
-#
-# Tipos: float (32 bits) = np.float32 en Python; int = np.int32.
-#
-# Cada hilo calcula un píxel de salida. Bloques e hilos se distribuyen solo en X:
-#   indice = blockIdx.x * blockDim.x + threadIdx.x   (posición en el arreglo plano)
-#   fila = indice / ancho,  col = indice % ancho
-# Si los píxeles no son múltiplo de los hilos por bloque, el último bloque tiene hilos
-# sobrantes: su índice queda fuera de la imagen y terminan sin escribir.
-# Extensión con ceros: un vecino fuera de la imagen aportaría 0, así que se omite.
-#
-# Parámetros del kernel:
-#   entrada      imagen original en memoria global (ancho*alto floats, fila tras fila)
-#   salida       arreglo separado donde se escribe el resultado (ancho*alto floats)
-#   mascara      k*k coeficientes, fila tras fila
-#   ancho, alto  dimensiones de la imagen
-#   k            lado de la máscara (impar)
+# Mismo kernel de filtros_gpu.cu (práctica 01), como cadena para SourceModule.
+# Cada hilo calcula un píxel. Con bloques e hilos solo en X, el índice global
+# blockIdx.x * blockDim.x + threadIdx.x recorre la imagen como un arreglo plano, y de él
+# salen la fila (indice / ancho) y la columna (indice % ancho). Los hilos sobrantes del
+# último bloque caen fuera de la imagen y salen sin escribir. Vecino fuera de la imagen:
+# vale 0, así que se omite.
 KERNEL_CONVOLUCION = """
 __global__ void kernelConvolucion(const float* entrada, float* salida, const float* mascara,
                                   int ancho, int alto, int k) {
@@ -74,24 +41,10 @@ __global__ void kernelConvolucion(const float* entrada, float* salida, const flo
 """
 
 
-# Contexto CUDA y kernel compilado, preparados una sola vez antes de las mediciones.
-#
-# No se usa pycuda.autoinit para poder medir por separado la inicialización del contexto
-# y la compilación/carga del kernel (la guía pide registrar ambos y no repetirlos dentro
-# de cada medición).
-#
-# Atributos:
-#   dispositivo         cuda.Device usado (GPU 0)
-#   ms_contexto         tiempo de cuda.init() + creación del contexto, en ms
-#   ms_compilacion      tiempo de compilar y cargar el kernel con SourceModule, en ms
-#   funcion             kernel "kernelConvolucion" listo para lanzar
+# Prepara la GPU una sola vez: contexto y kernel compilado. No se usa pycuda.autoinit
+# porque así se puede medir aparte cuánto tarda crear el contexto y cuánto compilar.
 class GpuConvolucion:
 
-    # Inicializa el driver, crea el contexto en la GPU indicada y compila el kernel.
-    # Si la compilación falla (por ejemplo, nvcc no soporta la arquitectura de la GPU),
-    # se libera el contexto antes de propagar el error.
-    # Parámetros:
-    #   numero_gpu  índice del dispositivo (0 por defecto)
     def __init__(self, numero_gpu=0):
         inicio = time.perf_counter()
         cuda.init()
@@ -99,6 +52,7 @@ class GpuConvolucion:
         self.contexto = self.dispositivo.make_context()
         self.ms_contexto = (time.perf_counter() - inicio) * 1000
 
+        # SourceModule llama a nvcc; si el kernel ya se compiló antes, lo toma de la caché.
         try:
             inicio = time.perf_counter()
             modulo = SourceModule(KERNEL_CONVOLUCION)
@@ -108,28 +62,19 @@ class GpuConvolucion:
             self.cerrar()
             raise
 
-    # Libera el contexto CUDA. Debe llamarse al terminar (main.py lo hace en un finally).
     def cerrar(self):
         self.contexto.pop()
         self.contexto.detach()
 
-    # Ejecuta la convolución en la GPU y mide cada etapa con eventos CUDA.
+    # Convolución en la GPU con las tres etapas medidas por separado.
     #
-    # La reserva de memoria y la copia de la máscara se hacen antes de medir, igual que
-    # en la práctica 01. La salida se llena con bytes 0xFF, que como float son NaN: si
-    # algún hilo no escribe su píxel, la comparación lo detecta.
+    # Fuera de la medición: reservar memoria, llenar la salida con 0xFF (NaN en float, para
+    # detectar píxeles sin calcular) y copiar la máscara. Dentro: copia CPU -> GPU, kernel
+    # y copia GPU -> CPU, cada una entre dos eventos. El kernel es asíncrono; por eso se
+    # espera al último evento antes de leer los tiempos.
     #
-    # Los eventos marcan el momento en que la GPU terminó todo lo anterior. El kernel es
-    # asíncrono: Python no lo espera, pero el evento siguiente solo se completa cuando
-    # acaba. fin.synchronize() espera al último evento antes de leer los tiempos.
-    #
-    # Parámetros:
-    #   entrada  arreglo plano de ancho*alto; se convierte a np.float32 contiguo
-    #   mascara  arreglo de k*k coeficientes; se convierte a np.float32 contiguo
-    #   ancho, alto  dimensiones de la imagen
-    #   k        lado de la máscara
-    #   hilos    hilos por bloque (dimensión X)
-    # Retorna: (salida np.float32 de ancho*alto, TiemposGpu).
+    # Los arreglos van como float32 contiguos y los enteros como np.int32, que es lo que
+    # espera la firma del kernel; PyCUDA no convierte tipos por su cuenta.
     def convolucion(self, entrada, mascara, ancho, alto, k, hilos):
         entrada = np.ascontiguousarray(entrada, dtype=np.float32)
         mascara = np.ascontiguousarray(mascara, dtype=np.float32)
@@ -144,6 +89,7 @@ class GpuConvolucion:
 
         inicio, tras_entrada, tras_kernel, fin = (cuda.Event() for _ in range(4))
 
+        # CPU -> GPU
         inicio.record()
         cuda.memcpy_htod(gpu_entrada, entrada)
         tras_entrada.record()
@@ -153,6 +99,7 @@ class GpuConvolucion:
                      block=(hilos, 1, 1), grid=(bloques, 1))
         tras_kernel.record()
 
+        # GPU -> CPU
         cuda.memcpy_dtoh(salida, gpu_salida)
         fin.record()
         fin.synchronize()
