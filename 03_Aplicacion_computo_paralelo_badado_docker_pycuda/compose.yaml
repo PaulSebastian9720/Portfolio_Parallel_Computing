@@ -1,0 +1,13 @@
+services:
+  convolucion:
+    build: .
+    image: convolucion-pycuda:0.1
+    ports:
+      - "3000:3000"
+      - "8000:8000"
+    environment:
+      MAX_MB: "64"
+      MAX_LADO: "6000"
+      MAX_COLA: "4"
+      TTL_MIN: "10"
+    gpus: all

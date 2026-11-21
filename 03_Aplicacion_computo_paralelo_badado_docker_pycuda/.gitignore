@@ -1,0 +1,29 @@
+# Entorno virtual y caché de Python
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+
+# Imágenes de entrada (se generan con preparar_imagenes.py)
+imagenes/
+
+# Informe: no se sube al repositorio
+Informe_LaTeX/
+
+# Resultados: solo se sube resultados.xlsx
+resultados/*
+!resultados/resultados.xlsx
+
+# Guía (screenshot), presentación y documentos de trabajo
+*.pdf
+*.pptx
+*.docx
+Screenshot*
+
+# IDE y sistema operativo
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+Thumbs.db
