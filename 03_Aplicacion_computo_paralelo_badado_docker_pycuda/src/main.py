@@ -147,38 +147,52 @@ async def procesar(
                               "absoluto en laplaciano y recorte en los demás"),
     umbral: int | None = Form(None, description="Solo con salida=umbral: T de 0 a 255"),
     umbral_abs: bool | None = Form(None, description="Solo con salida=umbral: comparar |valor|"),
+    guardar_float: bool = Form(False, description="Guardar también la salida float32 sin "
+                               "recortar (.npy) para la validación numérica"),
 ):
     inicio = time.perf_counter()
     id_solicitud = request.state.id
     coeficientes, k, salida = servicio.validar_parametros(
         filtro, k, hilos, mascara, salida, umbral, umbral_abs)
 
-    datos = await imagen.read()
-    if len(datos) > servicio.MAX_MB * 2**20:
-        raise ErrorSolicitud(413, "archivo_muy_grande", f"El máximo es {servicio.MAX_MB} MB")
+    trabajador = request.app.state.trabajador
+    with trabajador.turno():
+        datos = await imagen.read()
+        if len(datos) > servicio.MAX_MB * 2**20:
+            raise ErrorSolicitud(413, "archivo_muy_grande", f"El máximo es {servicio.MAX_MB} MB")
 
-    # Decodificación y preparación: formato real, escala de grises y float32.
-    t = time.perf_counter()
-    entrada, ancho, alto, formato, gris = await run_in_threadpool(servicio.decodificar, datos)
-    ms_decodificacion = (time.perf_counter() - t) * 1000
+        # Decodificación y preparación: formato real, escala de grises y float32.
+        t = time.perf_counter()
+        entrada, ancho, alto, formato, gris = await run_in_threadpool(servicio.decodificar, datos)
+        ms_decodificacion = (time.perf_counter() - t) * 1000
 
-    resultado, tiempos, ms_cola = await request.app.state.trabajador.ejecutar(
-        entrada, coeficientes, ancho, alto, k, hilos)
+        resultado, tiempos, ms_cola = await trabajador.ejecutar(
+            entrada, coeficientes, ancho, alto, k, hilos)
 
-    # Paso a 8 bits según el modo y escritura del PNG con nombre único.
-    t = time.perf_counter()
-    bytes_salida = await run_in_threadpool(servicio.a_8_bits, resultado, salida, umbral, umbral_abs)
-    ms_postproceso = (time.perf_counter() - t) * 1000
-    t = time.perf_counter()
-    await run_in_threadpool(servicio.guardar_png, bytes_salida, ancho, alto, f"{id_solicitud}.png")
-    ms_codificacion = (time.perf_counter() - t) * 1000
+        # Paso a 8 bits según el modo y escritura del PNG con nombre único.
+        t = time.perf_counter()
+        bytes_salida = await run_in_threadpool(
+            servicio.a_8_bits, resultado, salida, umbral, umbral_abs)
+        ms_postproceso = (time.perf_counter() - t) * 1000
+        t = time.perf_counter()
+        await run_in_threadpool(
+            servicio.guardar_png, bytes_salida, ancho, alto, f"{id_solicitud}.png")
+        ms_codificacion = (time.perf_counter() - t) * 1000
 
-    # El navegador no muestra PGM; en ese caso se guarda también la entrada en gris como PNG.
-    url_original = None
-    if formato == "PPM":
-        await run_in_threadpool(gris.save, servicio.DIR_RESULTADOS / f"{id_solicitud}_o.png",
-                                compress_level=1)
-        url_original = f"/api/resultados/{id_solicitud}_o"
+        # El navegador no muestra PGM; en ese caso se guarda también la entrada en gris.
+        url_original = None
+        if formato == "PPM":
+            await run_in_threadpool(gris.save, servicio.DIR_RESULTADOS / f"{id_solicitud}_o.png",
+                                    compress_level=1)
+            url_original = f"/api/resultados/{id_solicitud}_o"
+
+        # Salida float de la GPU antes del paso a 8 bits, para la validación numérica. Solo
+        # se escribe si se pide; cuando se pide, su escritura entra en el tiempo del servidor.
+        url_float = None
+        if guardar_float:
+            await run_in_threadpool(np.save, servicio.DIR_RESULTADOS / f"{id_solicitud}_f.npy",
+                                    resultado.reshape(alto, ancho))
+            url_float = f"/api/resultados/{id_solicitud}_f"
 
     pixeles = ancho * alto
     respuesta = {
@@ -197,21 +211,25 @@ async def procesar(
                        "servidor": (time.perf_counter() - inicio) * 1000},
         "url_resultado": f"/api/resultados/{id_solicitud}",
         "url_original": url_original,
+        "url_float": url_float,
     }
     log.info("%s %s k=%d hilos=%d %dx%d kernel=%.3f ms servidor=%.1f ms", id_solicitud, filtro,
              k, hilos, ancho, alto, tiempos.kernel, respuesta["tiempos_ms"]["servidor"])
     return respuesta
 
 
-@api.get("/api/resultados/{nombre}", summary="Descarga el PNG de una solicitud")
+@api.get("/api/resultados/{nombre}",
+         summary="Descarga el resultado: <id> (PNG), <id>_o (original en gris, PNG) o "
+                 "<id>_f (salida float32, .npy)")
 async def resultado(nombre: str):
-    base = nombre.removesuffix("_o")
-    ruta = servicio.DIR_RESULTADOS / f"{nombre}.png"
-    if not ID_VALIDO.match(base) or not ruta.is_file():
+    base, _, sufijo = nombre.partition("_")
+    extension, tipo = (".npy", "application/octet-stream") if sufijo == "f" else (".png", "image/png")
+    ruta = servicio.DIR_RESULTADOS / f"{nombre}{extension}"
+    if not ID_VALIDO.match(base) or sufijo not in ("", "o", "f") or not ruta.is_file():
         raise ErrorSolicitud(404, "resultado_no_encontrado",
                              f"No existe el resultado {nombre} o ya se borró "
                              f"(se guardan {servicio.TTL_MIN} min)")
-    return FileResponse(ruta, media_type="image/png", filename=f"convolucion_{nombre}.png")
+    return FileResponse(ruta, media_type=tipo, filename=f"convolucion_{nombre}{extension}")
 
 
 web = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)

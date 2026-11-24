@@ -5,35 +5,49 @@
 # El driver NVIDIA es del anfitrión y lo monta NVIDIA Container Toolkit con --gpus; la
 # imagen solo trae el toolkit CUDA 12.9 (nvcc, cabeceras). CUDA 12.8+ es necesario para
 # compilar a sm_120 (RTX serie 50); el driver del anfitrión debe admitir CUDA >= 12.9.
+# Ubuntu 22.04 trae Python 3.10 y numpy 2.5 pide 3.12, por eso se usa el PPA deadsnakes.
 
 ARG CUDA_IMAGEN=nvidia/cuda:12.9.1-devel-ubuntu22.04
 
-# Etapa 1: Python 3.12 y dependencias. pycuda se compila aquí contra las cabeceras CUDA,
-# así que el compilador de C++ y las cabeceras de Python no pasan a la imagen final.
+# Etapa 1: entorno virtual con las dependencias de pyproject.toml. pycuda se compila aquí
+# contra las cabeceras CUDA y de Python; esas cabeceras no pasan a la imagen final.
 FROM ${CUDA_IMAGEN} AS construccion
-COPY --from=ghcr.io/astral-sh/uv:0.13.8 /uv /usr/local/bin/uv
-ENV UV_PYTHON_INSTALL_DIR=/opt/python \
-    UV_COMPILE_BYTECODE=1 \
-    UV_LINK_MODE=copy \
-    UV_PYTHON_PREFERENCE=only-managed
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends software-properties-common gpg-agent && \
+    add-apt-repository -y ppa:deadsnakes/ppa && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends python3.12 python3.12-dev python3.12-venv && \
+    rm -rf /var/lib/apt/lists/*
+
+# pyproject.toml es la única lista de dependencias: se extrae con tomllib a un
+# requirements.txt y se instala con pip, sin uv.
 WORKDIR /app
-COPY pyproject.toml uv.lock .python-version ./
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv python install 3.12 && \
-    uv sync --frozen --no-dev --no-install-project
+COPY pyproject.toml ./
+RUN python3.12 -m venv /opt/venv && \
+    python3.12 -c "import tomllib; print('\n'.join(tomllib.load(open('pyproject.toml', 'rb'))['project']['dependencies']))" > requirements.txt && \
+    /opt/venv/bin/pip install --no-cache-dir --upgrade pip && \
+    /opt/venv/bin/pip install --no-cache-dir -r requirements.txt
 
 # Etapa 2: misma base CUDA devel, porque SourceModule llama a nvcc al iniciar el servicio.
+# Solo se instala el intérprete 3.12 (sin -dev) y se copia el entorno virtual.
 FROM ${CUDA_IMAGEN}
+ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && \
+    apt-get install -y --no-install-recommends software-properties-common gpg-agent && \
+    add-apt-repository -y ppa:deadsnakes/ppa && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends python3.12 && \
+    apt-get purge -y --auto-remove software-properties-common gpg-agent && \
     apt-get upgrade -y --no-install-recommends && \
     rm -rf /var/lib/apt/lists/* && \
     useradd --create-home --uid 1000 app
-COPY --from=construccion /opt/python /opt/python
-COPY --from=construccion --chown=app:app /app/.venv /app/.venv
+
+COPY --from=construccion /opt/venv /opt/venv
 WORKDIR /app
 COPY --chown=app:app src ./src
 
-ENV PATH=/app/.venv/bin:$PATH \
+ENV PATH=/opt/venv/bin:$PATH \
     PYTHONUNBUFFERED=1 \
     DIR_RESULTADOS=/tmp/resultados \
     PUERTO_WEB=3000 \

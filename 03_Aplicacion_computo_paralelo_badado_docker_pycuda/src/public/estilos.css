@@ -98,7 +98,7 @@ select:focus, input:focus, button:focus-visible { outline: 2px solid var(--azul-
 .matriz { border-collapse: collapse; margin: 0 auto; }
 .matriz td { border: 1px solid var(--azul-100); padding: 0; }
 .matriz input {
-  width: 58px;
+  width: var(--ancho-celda, 58px);
   padding: 5px 4px;
   border: 0;
   border-radius: 0;
@@ -110,7 +110,7 @@ select:focus, input:focus, button:focus-visible { outline: 2px solid var(--azul-
 .matriz input[readonly] { background: var(--blanco); color: var(--azul-900); }
 .matriz input.negativo { color: var(--error); }
 .matriz input.centro { background: var(--azul-100); font-weight: 600; }
-.matriz.densa input { width: 44px; font-size: 10px; padding: 3px 2px; }
+.matriz.densa input { font-size: 9px; padding: 3px 1px; }
 .matriz input:not([readonly]) { background: var(--azul-50); }
 
 button {

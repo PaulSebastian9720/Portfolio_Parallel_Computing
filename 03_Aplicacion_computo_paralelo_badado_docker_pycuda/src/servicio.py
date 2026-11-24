@@ -9,6 +9,7 @@ import tempfile
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from pathlib import Path
 
 import numpy as np
@@ -166,7 +167,7 @@ def guardar_png(arreglo, ancho, alto, nombre):
 def borrar_antiguos():
     limite = time.time() - TTL_MIN * 60
     borrados = 0
-    for ruta in DIR_RESULTADOS.glob("*.png"):
+    for ruta in DIR_RESULTADOS.glob("*.*"):
         try:
             if ruta.stat().st_mtime < limite:
                 ruta.unlink()
@@ -178,8 +179,9 @@ def borrar_antiguos():
 
 
 # Toda la GPU pasa por un único hilo: el contexto CUDA se crea en él y queda activo ahí, y
-# las convoluciones se ejecutan una tras otra. Las solicitudes que esperan su turno forman
-# la cola; si ya hay MAX_COLA en curso o esperando, la siguiente se rechaza con 503.
+# las convoluciones se ejecutan una tras otra. Una solicitud ocupa un lugar desde que se
+# acepta hasta que responde (decodificación, GPU y PNG); si ya hay MAX_COLA lugares
+# ocupados, la siguiente se rechaza con 503. Así se acota también la memoria del anfitrión.
 class TrabajadorGpu:
 
     def __init__(self):
@@ -222,7 +224,8 @@ class TrabajadorGpu:
                 "gpu": self.info, "pendientes": self.pendientes, "max_cola": MAX_COLA,
                 "atendidas": self.atendidas, "rechazadas": self.rechazadas}
 
-    async def ejecutar(self, entrada, mascara, ancho, alto, k, hilos):
+    @contextmanager
+    def turno(self):
         if self.gpu is None:
             raise ErrorSolicitud(503, "gpu_no_disponible",
                                  f"No hay GPU CUDA disponible: {self.error_inicio}")
@@ -233,12 +236,16 @@ class TrabajadorGpu:
                                      f"Hay {self.pendientes} solicitudes en curso; máximo {MAX_COLA}")
             self.pendientes += 1
         try:
-            encolada = time.perf_counter()
-            return await asyncio.get_running_loop().run_in_executor(
-                self.ejecutor, self._convolucion, encolada, entrada, mascara, ancho, alto, k, hilos)
+            yield
         finally:
             with self.candado:
                 self.pendientes -= 1
+
+    # La espera en cola es el tiempo entre pedir el hilo de la GPU y empezar a usarlo.
+    async def ejecutar(self, entrada, mascara, ancho, alto, k, hilos):
+        encolada = time.perf_counter()
+        return await asyncio.get_running_loop().run_in_executor(
+            self.ejecutor, self._convolucion, encolada, entrada, mascara, ancho, alto, k, hilos)
 
     # Corre en el hilo de la GPU. Antes de reservar comprueba que entrada y salida (dos
     # arreglos float32 del tamaño de la imagen) quepan en la memoria libre.

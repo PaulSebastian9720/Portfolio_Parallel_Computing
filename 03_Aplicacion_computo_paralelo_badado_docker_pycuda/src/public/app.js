@@ -82,7 +82,10 @@ function dibujarMatriz(valores) {
   const k = kActual();
   const editable = $("filtro").value === "personalizado";
   const tabla = $("matriz");
-  tabla.classList.toggle("densa", k > 7);
+  // Celdas más angostas cuanto mayor es k, para que hasta 9×9 quepa sin desplazamiento.
+  const ancho = Math.max(30, Math.min(58, Math.floor(318 / k) - 2));
+  tabla.style.setProperty("--ancho-celda", `${ancho}px`);
+  tabla.classList.toggle("densa", ancho < 44);
   tabla.replaceChildren();
   for (let i = 0; i < k; i++) {
     const fila = tabla.insertRow();
@@ -154,6 +157,9 @@ function alCambiarK() {
     mostrarAviso("");
     const previo = leerMatriz();
     const kPrevio = Math.round(Math.sqrt(previo.length));
+    // El navegador vuelve a lanzar "change" al salir del campo; si k no cambió, redibujar
+    // borraría lo que se está escribiendo en la matriz.
+    if (k === kPrevio) return;
     const nuevos = Array(k * k).fill(0);
     const desfase = (kPrevio - k) / 2;
     for (let i = 0; i < k; i++) for (let j = 0; j < k; j++) {
@@ -333,6 +339,17 @@ function agregarHistorial(r, cliente, error) {
   fila.lastChild.className = r ? "ok" : "mal";
 }
 
+// Tras un error no debe quedar a la vista el resultado de la solicitud anterior.
+function limpiarResultado(motivo) {
+  liberarUrl("urlResultado");
+  $("img-resultado").removeAttribute("src");
+  $("descargar").hidden = true;
+  $("cap-resultado").textContent = "";
+  for (const id of ["t-lanzamiento", "t-tiempos"]) {
+    $(id).innerHTML = `<tr><td class="vacio">${motivo}</td></tr>`;
+  }
+}
+
 async function descargarBlob(ruta) {
   const r = await fetch(API + ruta);
   if (!r.ok) throw new Error(`No se pudo descargar ${ruta}: HTTP ${r.status}`);
@@ -373,6 +390,7 @@ async function procesar(evento) {
       const error = { ...cuerpo, estado: r.status };
       agregarHistorial(null, performance.now() - inicio, error);
       mostrarAviso(`${r.status} ${error.error}: ${error.detalle}`);
+      limpiarResultado(`Solicitud ${error.id ? error.id.slice(0, 8) : ""} rechazada con ${r.status}`);
       return;
     }
 

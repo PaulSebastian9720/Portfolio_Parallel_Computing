@@ -2,12 +2,14 @@
 
     uv run src/preparar_imagenes.py <foto_origen> imagenes [--jpg]
     uv run src/preparar_imagenes.py --desde-pgm <carpeta_pgm> imagenes [--jpg]
+    uv run src/preparar_imagenes.py --pruebas <foto_origen> imagenes
 """
 
 import hashlib
 import sys
 from pathlib import Path
 
+import numpy as np
 from PIL import Image, ImageOps
 
 RESOLUCIONES = (500, 2000, 4000, 6000)
@@ -53,6 +55,36 @@ def desde_pgm(carpeta):
             yield resolucion, pgm.copy()
 
 
+# Matriz de la Figura 1 de la guía de la práctica 02, para la prueba manual.
+MATRIZ_FIGURA = [35, 40, 41, 45, 50,
+                 40, 40, 42, 46, 52,
+                 42, 46, 50, 55, 55,
+                 48, 52, 56, 58, 60,
+                 56, 60, 65, 70, 75]
+
+
+# Imágenes de prueba con dimensiones que no son cuadradas ni múltiplo de los hilos por
+# bloque, más una que pasa el límite de píxeles del servicio. Las recortadas salen de la
+# foto en gris, sin redimensionar.
+def de_prueba(origen):
+    with Image.open(origen) as foto:
+        gris = ImageOps.exif_transpose(foto).convert("L")
+    ancho, alto = gris.size
+
+    def centro(w, h):
+        x, y = (ancho - w) // 2, (alto - h) // 2
+        return gris.crop((x, y, x + w, y + h))
+
+    yield "prueba_5x5", Image.fromarray(np.array(MATRIZ_FIGURA, np.uint8).reshape(5, 5), "L")
+    # Patrón de la práctica 02: (i * 37) mod 256 recorrido fila tras fila.
+    patron = (np.arange(1003 * 997, dtype=np.int64) * 37 % 256).astype(np.uint8)
+    yield "prueba_1003x997", Image.fromarray(patron.reshape(997, 1003), "L")
+    yield "prueba_37x23", centro(37, 23)
+    yield "prueba_1921x1081", centro(1921, 1081)
+    yield "prueba_7680x4320", centro(7680, 4320)
+    yield "excede_8000x5000", centro(8000, 5000)
+
+
 def sha256(ruta):
     h = hashlib.sha256()
     with open(ruta, "rb") as f:
@@ -91,7 +123,14 @@ if __name__ == "__main__":
     con_jpg = "--jpg" in argumentos
     argumentos = [a for a in argumentos if a != "--jpg"]
 
-    if len(argumentos) == 3 and argumentos[0] == "--desde-pgm":
+    if len(argumentos) == 3 and argumentos[0] == "--pruebas":
+        destino = Path(argumentos[2])
+        destino.mkdir(parents=True, exist_ok=True)
+        lineas = [escribir(destino / f"{nombre}.png", imagen)
+                  for nombre, imagen in de_prueba(argumentos[1])]
+        print("\n".join(lineas))
+        (destino / "hashes_pruebas.txt").write_text("\n".join(lineas) + "\n", encoding="utf-8")
+    elif len(argumentos) == 3 and argumentos[0] == "--desde-pgm":
         preparar(desde_pgm(argumentos[1]), argumentos[2], con_jpg)
     elif len(argumentos) == 2 and not argumentos[0].startswith("--"):
         preparar(desde_foto(argumentos[0]), argumentos[1], con_jpg)
