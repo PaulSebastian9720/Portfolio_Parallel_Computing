@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Convolución PyCUDA</title>
+  <link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+  <header class="barra">
+    <h1>Convolución PyCUDA</h1>
+    <dl class="estado" id="estado">
+      <div><dt>GPU</dt><dd id="e-gpu">conectando…</dd></div>
+      <div><dt>CC</dt><dd id="e-cc">—</dd></div>
+      <div><dt>Memoria</dt><dd id="e-mem">—</dd></div>
+      <div><dt>Driver / PyCUDA</dt><dd id="e-ver">—</dd></div>
+      <div><dt>Contexto / compilación / 1er lanzamiento</dt><dd id="e-ini">—</dd></div>
+      <div><dt>Cola</dt><dd id="e-cola">—</dd></div>
+    </dl>
+  </header>
+
+  <main class="disposicion">
+    <form class="panel" id="formulario" novalidate>
+      <fieldset>
+        <legend>Imagen</legend>
+        <input type="file" id="archivo" accept=".png,.jpg,.jpeg,.bmp,.pgm,image/*" required>
+        <p class="nota" id="info-archivo">PNG, JPEG, BMP o PGM de 8 bits. Se procesa en escala de grises.</p>
+      </fieldset>
+
+      <fieldset class="fila-3">
+        <legend>Filtro y lanzamiento</legend>
+        <label>Filtro
+          <select id="filtro"></select>
+        </label>
+        <label>Máscara k×k
+          <select id="k"></select>
+          <input type="number" id="k-texto" min="1" max="15" step="2" value="3" hidden>
+        </label>
+        <label>Hilos / bloque
+          <select id="hilos"></select>
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Máscara <span class="nota" id="suma-mascara"></span></legend>
+        <div class="contenedor-matriz">
+          <table class="matriz" id="matriz"></table>
+        </div>
+        <button type="button" class="secundario" id="editar-mascara">Editar como personalizada</button>
+      </fieldset>
+
+      <fieldset>
+        <legend>Salida a 8 bits</legend>
+        <div class="opciones" id="modos-salida">
+          <label><input type="radio" name="salida" value="recorte"> Recorte [0, 255]</label>
+          <label><input type="radio" name="salida" value="absoluto"> |valor| y recorte</label>
+          <label><input type="radio" name="salida" value="umbral"> Umbral binario</label>
+        </div>
+        <div class="umbral" id="bloque-umbral" hidden>
+          <label>Umbral T
+            <input type="range" id="umbral" min="0" max="255" value="128">
+          </label>
+          <output id="valor-umbral">128</output>
+          <label class="casilla"><input type="checkbox" id="umbral-abs"> sobre |valor|</label>
+        </div>
+        <p class="nota" id="nota-salida"></p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Lanzamiento previsto</legend>
+        <table class="datos compacta">
+          <tr><th>W × H</th><td id="p-dim">—</td></tr>
+          <tr><th>Píxeles</th><td id="p-px">—</td></tr>
+          <tr><th>Bloques = ⌈px / hilos⌉</th><td id="p-bloques">—</td></tr>
+          <tr><th>Hilos lanzados</th><td id="p-lanzados">—</td></tr>
+        </table>
+        <p class="nota" id="p-limites"></p>
+      </fieldset>
+
+      <button type="submit" class="principal" id="procesar" disabled>Procesar en GPU</button>
+    </form>
+
+    <section class="contenido">
+      <p class="aviso" id="aviso" hidden></p>
+
+      <div class="imagenes">
+        <figure>
+          <figcaption>Original <span class="nota" id="cap-original"></span></figcaption>
+          <div class="lienzo"><img id="img-original" alt=""></div>
+        </figure>
+        <figure>
+          <figcaption>
+            Resultado <span class="nota" id="cap-resultado"></span>
+            <a class="descarga" id="descargar" hidden>Descargar PNG</a>
+          </figcaption>
+          <div class="lienzo"><img id="img-resultado" alt=""></div>
+        </figure>
+      </div>
+
+      <div class="metricas">
+        <section>
+          <h2>Lanzamiento</h2>
+          <table class="datos" id="t-lanzamiento"><tr><td class="vacio">Sin solicitudes</td></tr></table>
+        </section>
+        <section>
+          <h2>Tiempos <span class="nota">ms</span></h2>
+          <table class="datos tiempos" id="t-tiempos"><tr><td class="vacio">Sin solicitudes</td></tr></table>
+        </section>
+      </div>
+
+      <section class="historial">
+        <h2>Solicitudes de esta sesión</h2>
+        <table class="datos">
+          <thead>
+            <tr><th>#</th><th>Id</th><th>Filtro</th><th>k</th><th>Hilos</th><th>Bloques</th>
+                <th>W × H</th><th>HtoD</th><th>Kernel</th><th>DtoH</th><th>Servidor</th><th>Cliente</th><th>Estado</th></tr>
+          </thead>
+          <tbody id="historial"></tbody>
+        </table>
+      </section>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
